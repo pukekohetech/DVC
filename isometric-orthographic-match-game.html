@@ -1,0 +1,2187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isometric View Match Challenge</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg: #eef2f7;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --text: #152033;
+      --muted: #5f6b7a;
+      --line: #cad5e2;
+      --accent: #1d4ed8;
+      --accent-soft: #dbeafe;
+      --good: #166534;
+      --good-soft: #dcfce7;
+      --bad: #b91c1c;
+      --bad-soft: #fee2e2;
+      --warn: #92400e;
+      --warn-soft: #fef3c7;
+      --shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: linear-gradient(180deg, #f5f7fb 0%, #e9eef6 100%);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    .app {
+      width: min(1500px, calc(100vw - 24px));
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .topbar {
+      padding: 14px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 18px;
+    }
+
+    .titleWrap h1 {
+      margin: 0;
+      font-size: clamp(24px, 2.8vw, 36px);
+      line-height: 1.04;
+    }
+
+    .titleWrap p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .topStats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .stat {
+      min-width: 120px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .statLabel {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+
+    .statValue {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .setup {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+    }
+
+    .setupCard {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel-2);
+      padding: 16px;
+    }
+
+    .setupCard h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .setupCard p,
+    .setupCard li {
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .formGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 13px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .modeOptions {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .modeCard {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 13px 14px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      cursor: pointer;
+    }
+
+    .modeCard input {
+      width: auto;
+      margin-top: 2px;
+    }
+
+    .modeCard strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 15px;
+    }
+
+    .modeCard span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 14px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .primaryBtn {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .ghostBtn {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .goodBtn {
+      background: var(--good);
+      color: #fff;
+    }
+
+    .game {
+      display: none;
+      grid-template-columns: 0.78fr 1.22fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .game.active {
+      display: grid;
+    }
+
+    .sidebar,
+    .board {
+      padding: 16px;
+    }
+
+    .subtleTitle {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .focusCard {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 20px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .focusHeader {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .focusHeader h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .focusStatus {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .focusCanvas {
+      width: 100%;
+      height: 240px;
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    .targetGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .targetCard {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 16px;
+      padding: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    }
+
+    .targetCard:hover {
+      transform: translateY(-1px);
+    }
+
+    .targetCard.current {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .targetCard.done {
+      border-color: #86efac;
+      background: var(--good-soft);
+    }
+
+    .targetCard canvas {
+      width: 100%;
+      height: 90px;
+      display: block;
+      background: transparent;
+    }
+
+    .targetMeta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .targetMeta span:last-child {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .helperCard {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 14px;
+      margin-top: 14px;
+    }
+
+    .helperCard p {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .boardHeader {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .boardHeader h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .selectionInfo {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .viewGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .viewCard {
+      position: relative;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 12px;
+      min-height: 195px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .viewCard:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .viewCard.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .viewCard.correct {
+      border-color: #16a34a;
+      background: var(--good-soft);
+      cursor: default;
+    }
+
+    .viewCard.missed {
+      border-color: #ef4444;
+      background: var(--bad-soft);
+    }
+
+    .viewCard.disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .viewCardHeader {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .viewNum {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .viewTag {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--muted);
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .viewCard canvas {
+      width: 100%;
+      height: 120px;
+      display: block;
+      background: #fff;
+      border-radius: 12px;
+    }
+
+    .viewFoot {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .controlRow {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 16px;
+      align-items: center;
+    }
+
+    .messageBar {
+      min-height: 46px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      flex: 1;
+    }
+
+    .messageBar.good {
+      border-color: #86efac;
+      background: var(--good-soft);
+      color: var(--good);
+    }
+
+    .messageBar.bad {
+      border-color: #fca5a5;
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+
+    .messageBar.warn {
+      border-color: #fcd34d;
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.56);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 40;
+    }
+
+    .overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      width: min(720px, calc(100vw - 24px));
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 30px 70px rgba(15, 23, 42, 0.25);
+      padding: 22px;
+      border: 1px solid var(--line);
+    }
+
+    .modal h2 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.05;
+    }
+
+    .modal p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .summaryGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .summaryCard {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel-2);
+      padding: 12px;
+    }
+
+    .summaryCard .statLabel {
+      margin-bottom: 5px;
+    }
+
+    .summaryCard .statValue {
+      font-size: 26px;
+    }
+
+    .resultLine {
+      margin-top: 6px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .smallToast {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 50;
+      max-width: 360px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid #86efac;
+      background: var(--good-soft);
+      color: var(--good);
+      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+      font-weight: 700;
+      display: none;
+    }
+
+    .smallToast.show {
+      display: block;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1150px) {
+      .setup,
+      .game,
+      .summaryGrid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 10px;
+      }
+
+      .app {
+        width: 100%;
+      }
+
+      .formGrid,
+      .viewGrid,
+      .targetGrid,
+      .summaryGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .topStats {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .stat {
+        flex: 1 1 calc(50% - 10px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel topbar">
+      <div class="titleWrap">
+        <h1>Isometric View Match Challenge</h1>
+        <p>Match each isometric block to its three orthographic views: front, left, and top.</p>
+      </div>
+      <div class="topStats">
+        <div class="stat">
+          <div class="statLabel">Student</div>
+          <div class="statValue" id="studentDisplay">—</div>
+        </div>
+        <div class="stat">
+          <div class="statLabel">Class</div>
+          <div class="statValue" id="classDisplay">—</div>
+        </div>
+        <div class="stat">
+          <div class="statLabel">Mode</div>
+          <div class="statValue" id="modeDisplay">Setup</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel setup" id="setupScreen">
+      <div class="setupCard">
+        <h2>Set up the round</h2>
+        <p>Students enter their details, choose a game mode, and then match the orthographic drawings to each isometric block. Correct choices stay locked in place. Wrong choices count against the score in sprint mode.</p>
+        <div class="formGrid">
+          <label>
+            Student name
+            <input id="studentName" type="text" placeholder="Enter student name" maxlength="40" />
+          </label>
+          <label>
+            Class
+            <input id="studentClass" type="text" placeholder="Enter class" maxlength="30" />
+          </label>
+        </div>
+
+        <div class="modeOptions">
+          <label class="modeCard">
+            <input type="radio" name="gameMode" value="sheet" checked />
+            <div>
+              <strong>Fastest sheet</strong>
+              <span>Complete one full sheet of six blocks as quickly as possible. Best result is the fastest time.</span>
+            </div>
+          </label>
+          <label class="modeCard">
+            <input type="radio" name="gameMode" value="sprint" />
+            <div>
+              <strong>10-minute sprint</strong>
+              <span>Work for ten minutes and complete as many sheets as possible. Final score is correct guesses minus wrong guesses.</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button class="primaryBtn" id="startBtn" type="button">Start round</button>
+          <button class="ghostBtn" id="demoBtn" type="button">Quick demo data</button>
+        </div>
+      </div>
+
+      <div class="setupCard">
+        <h2>How students play</h2>
+        <ol>
+          <li>Pick the current target block from A–F, or stay with the automatically selected one.</li>
+          <li>Click up to three orthographic cards that belong to that block.</li>
+          <li>Use <strong>Check selection</strong> to lock correct views and release wrong ones.</li>
+          <li>Finish all six blocks for a sheet, or keep going through new sheets in sprint mode.</li>
+        </ol>
+        <p>Dashed lines show hidden detail. A short success message appears after each block is fully matched.</p>
+        <p>This page runs entirely in the browser, so it can be saved as a single HTML file and shared with students.</p>
+      </div>
+    </section>
+
+    <section class="game" id="gameScreen">
+      <aside class="panel sidebar">
+        <div class="subtleTitle">Current target</div>
+        <div class="focusCard">
+          <div class="focusHeader">
+            <h2 id="focusTitle">Block A</h2>
+            <div class="focusStatus" id="focusStatus">0 / 3 matched</div>
+          </div>
+          <canvas class="focusCanvas" id="focusCanvas"></canvas>
+          <div class="targetGrid" id="targetGrid"></div>
+        </div>
+
+        <div class="helperCard">
+          <div class="subtleTitle">Round details</div>
+          <p id="roundInfo">Choose three matching views for the current block, then check them.</p>
+          <p><strong>Tip:</strong> A correct card stays green and locked. Wrong picks flash red and go back into the pool.</p>
+        </div>
+      </aside>
+
+      <section class="panel board">
+        <div class="boardHeader">
+          <div>
+            <h2>Orthographic board</h2>
+            <div class="selectionInfo" id="selectionInfo">Select up to 3 cards for the current block.</div>
+          </div>
+          <div class="topStats">
+            <div class="stat">
+              <div class="statLabel">Timer</div>
+              <div class="statValue" id="timerDisplay">00:00</div>
+            </div>
+            <div class="stat">
+              <div class="statLabel">Correct</div>
+              <div class="statValue" id="correctDisplay">0</div>
+            </div>
+            <div class="stat">
+              <div class="statLabel">Wrong</div>
+              <div class="statValue" id="wrongDisplay">0</div>
+            </div>
+            <div class="stat">
+              <div class="statLabel">Sheets</div>
+              <div class="statValue" id="sheetDisplay">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="viewGrid" id="viewGrid"></div>
+
+        <div class="controlRow">
+          <div class="messageBar" id="messageBar">Start by choosing cards for the highlighted block.</div>
+          <div class="actions" style="margin-top: 0;">
+            <button class="goodBtn" id="checkBtn" type="button">Check selection</button>
+            <button class="ghostBtn" id="clearBtn" type="button">Clear picks</button>
+            <button class="ghostBtn" id="endBtn" type="button">End round</button>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <div class="overlay" id="resultOverlay">
+    <div class="modal">
+      <h2 id="resultTitle">Round complete</h2>
+      <p id="resultIntro">Here is the summary for this attempt.</p>
+      <div class="summaryGrid">
+        <div class="summaryCard">
+          <div class="statLabel">Student</div>
+          <div class="statValue" id="resultStudent">—</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Class</div>
+          <div class="statValue" id="resultClass">—</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Mode</div>
+          <div class="statValue" id="resultMode">—</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Timer</div>
+          <div class="statValue" id="resultTimer">00:00</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Correct</div>
+          <div class="statValue" id="resultCorrect">0</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Wrong</div>
+          <div class="statValue" id="resultWrong">0</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Net score</div>
+          <div class="statValue" id="resultNet">0</div>
+        </div>
+        <div class="summaryCard">
+          <div class="statLabel">Sheets completed</div>
+          <div class="statValue" id="resultSheets">0</div>
+        </div>
+      </div>
+      <div class="resultLine" id="resultLine"></div>
+      <div class="actions">
+        <button class="primaryBtn" id="playAgainBtn" type="button">Play again</button>
+        <button class="ghostBtn" id="closeOverlayBtn" type="button">Stay on results</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="smallToast" id="toast"></div>
+
+  <script>
+    const W = 4;
+    const D = 6;
+    const H = 4;
+    const TILE_W = 32;
+    const TILE_H = 16;
+    const CUBE_H = 20;
+    const BLOCK_COUNT = 6;
+    const BLOCK_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const PRESET = {
+      topBias: 0.4,
+      removeAmt: 0.6,
+      clusterAmt: 0.5,
+      slopeAmt: 1,
+    };
+
+    const els = {
+      setupScreen: document.getElementById('setupScreen'),
+      gameScreen: document.getElementById('gameScreen'),
+      studentName: document.getElementById('studentName'),
+      studentClass: document.getElementById('studentClass'),
+      startBtn: document.getElementById('startBtn'),
+      demoBtn: document.getElementById('demoBtn'),
+      studentDisplay: document.getElementById('studentDisplay'),
+      classDisplay: document.getElementById('classDisplay'),
+      modeDisplay: document.getElementById('modeDisplay'),
+      focusTitle: document.getElementById('focusTitle'),
+      focusStatus: document.getElementById('focusStatus'),
+      focusCanvas: document.getElementById('focusCanvas'),
+      targetGrid: document.getElementById('targetGrid'),
+      viewGrid: document.getElementById('viewGrid'),
+      roundInfo: document.getElementById('roundInfo'),
+      selectionInfo: document.getElementById('selectionInfo'),
+      timerDisplay: document.getElementById('timerDisplay'),
+      correctDisplay: document.getElementById('correctDisplay'),
+      wrongDisplay: document.getElementById('wrongDisplay'),
+      sheetDisplay: document.getElementById('sheetDisplay'),
+      messageBar: document.getElementById('messageBar'),
+      checkBtn: document.getElementById('checkBtn'),
+      clearBtn: document.getElementById('clearBtn'),
+      endBtn: document.getElementById('endBtn'),
+      resultOverlay: document.getElementById('resultOverlay'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultIntro: document.getElementById('resultIntro'),
+      resultStudent: document.getElementById('resultStudent'),
+      resultClass: document.getElementById('resultClass'),
+      resultMode: document.getElementById('resultMode'),
+      resultTimer: document.getElementById('resultTimer'),
+      resultCorrect: document.getElementById('resultCorrect'),
+      resultWrong: document.getElementById('resultWrong'),
+      resultNet: document.getElementById('resultNet'),
+      resultSheets: document.getElementById('resultSheets'),
+      resultLine: document.getElementById('resultLine'),
+      playAgainBtn: document.getElementById('playAgainBtn'),
+      closeOverlayBtn: document.getElementById('closeOverlayBtn'),
+      toast: document.getElementById('toast'),
+    };
+
+    const state = {
+      player: { name: '', className: '' },
+      mode: 'sheet',
+      running: false,
+      currentSheetNumber: 1,
+      sheetsCompleted: 0,
+      correct: 0,
+      wrong: 0,
+      currentSheet: null,
+      currentBlockId: 1,
+      selectedTiles: [],
+      startTime: 0,
+      endTime: 0,
+      timerHandle: null,
+      sprintDurationMs: 10 * 60 * 1000,
+      sprintTimeLeft: 10 * 60 * 1000,
+      finished: false,
+    };
+
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function iso(x, y, z, originX, originY) {
+      return {
+        x: originX + (x - y) * TILE_W,
+        y: originY + (x + y) * TILE_H - z * CUBE_H,
+      };
+    }
+
+    function computeIsoBounds(occupiedData) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      for (const c of occupiedData) {
+        const p = iso(c.x, c.y, c.z, 0, 0);
+        minX = Math.min(minX, p.x - TILE_W - 2);
+        maxX = Math.max(maxX, p.x + TILE_W + 2);
+        minY = Math.min(minY, p.y - 2);
+        maxY = Math.max(maxY, p.y + TILE_H * 2 + CUBE_H + 2);
+      }
+
+      if (!occupiedData.length) {
+        minX = minY = 0;
+        maxX = maxY = 1;
+      }
+
+      return { minX, maxX, minY, maxY };
+    }
+
+    function drawCube(ctx, x, y, z, originX, originY, occupiedSet) {
+      const p = iso(x, y, z, originX, originY);
+      const top = 'rgb(248,248,248)';
+      const left = 'rgb(232,232,232)';
+      const right = 'rgb(214,214,214)';
+      const stroke = 'rgba(20,20,20,0.96)';
+
+      const hasTop = occupiedSet.has(`${x},${y},${z + 1}`);
+      const hasLeftNeighbor = occupiedSet.has(`${x},${y + 1},${z}`);
+      const hasRightNeighbor = occupiedSet.has(`${x + 1},${y},${z}`);
+
+      const topFrontJoin = occupiedSet.has(`${x},${y - 1},${z}`) && !occupiedSet.has(`${x},${y - 1},${z + 1}`);
+      const topRightJoin = occupiedSet.has(`${x + 1},${y},${z}`) && !occupiedSet.has(`${x + 1},${y},${z + 1}`);
+      const topBackJoin = occupiedSet.has(`${x},${y + 1},${z}`) && !occupiedSet.has(`${x},${y + 1},${z + 1}`);
+      const topLeftJoin = occupiedSet.has(`${x - 1},${y},${z}`) && !occupiedSet.has(`${x - 1},${y},${z + 1}`);
+
+      const leftTopJoin = occupiedSet.has(`${x},${y},${z + 1}`) && !occupiedSet.has(`${x},${y + 1},${z + 1}`);
+      const leftBottomJoin = z > 0 && occupiedSet.has(`${x},${y},${z - 1}`) && !occupiedSet.has(`${x},${y + 1},${z - 1}`);
+      const leftPrevJoin = occupiedSet.has(`${x - 1},${y},${z}`) && !occupiedSet.has(`${x - 1},${y + 1},${z}`);
+      const leftNextJoin = occupiedSet.has(`${x + 1},${y},${z}`) && !occupiedSet.has(`${x + 1},${y + 1},${z}`);
+
+      const rightTopJoin = occupiedSet.has(`${x},${y},${z + 1}`) && !occupiedSet.has(`${x + 1},${y},${z + 1}`);
+      const rightBottomJoin = z > 0 && occupiedSet.has(`${x},${y},${z - 1}`) && !occupiedSet.has(`${x + 1},${y},${z - 1}`);
+      const rightPrevJoin = occupiedSet.has(`${x},${y - 1},${z}`) && !occupiedSet.has(`${x + 1},${y - 1},${z}`);
+      const rightNextJoin = occupiedSet.has(`${x},${y + 1},${z}`) && !occupiedSet.has(`${x + 1},${y + 1},${z}`);
+
+      if (!hasTop) {
+        const a = { x: p.x, y: p.y };
+        const b = { x: p.x + TILE_W, y: p.y + TILE_H };
+        const c = { x: p.x, y: p.y + TILE_H * 2 };
+        const d = { x: p.x - TILE_W, y: p.y + TILE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = top;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!topFrontJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!topRightJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!topBackJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!topLeftJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+
+      if (!hasLeftNeighbor) {
+        const a = { x: p.x - TILE_W, y: p.y + TILE_H };
+        const b = { x: p.x, y: p.y + TILE_H * 2 };
+        const c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H };
+        const d = { x: p.x - TILE_W, y: p.y + TILE_H + CUBE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = left;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!leftTopJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!leftNextJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!leftBottomJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!leftPrevJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+
+      if (!hasRightNeighbor) {
+        const a = { x: p.x + TILE_W, y: p.y + TILE_H };
+        const b = { x: p.x, y: p.y + TILE_H * 2 };
+        const c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H };
+        const d = { x: p.x + TILE_W, y: p.y + TILE_H + CUBE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = right;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!rightTopJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!rightNextJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!rightBottomJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!rightPrevJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+    }
+
+    function renderIsoCanvas(canvas, occupiedData) {
+      if (!canvas) return;
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const bounds = computeIsoBounds(occupiedData);
+      const availableW = rect.width - 22;
+      const availableH = rect.height - 22;
+      const shapeW = bounds.maxX - bounds.minX;
+      const shapeH = bounds.maxY - bounds.minY;
+      const scale = Math.min(availableW / shapeW, availableH / shapeH, 1.56);
+
+      ctx.save();
+      ctx.translate(rect.width / 2, rect.height / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-(bounds.minX + shapeW / 2), -(bounds.minY + shapeH / 2));
+
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+      const sorted = [...occupiedData].sort((a, b) => {
+        const da = a.x + a.y + a.z * 0.01;
+        const db = b.x + b.y + b.z * 0.01;
+        return da - db || a.z - b.z;
+      });
+
+      for (const cube of sorted) {
+        drawCube(ctx, cube.x, cube.y, cube.z, 0, 0, occupiedSet);
+      }
+
+      ctx.restore();
+    }
+
+    function buildAssembly(settings) {
+      const grid = Array.from({ length: H }, () =>
+        Array.from({ length: D }, () => Array.from({ length: W }, () => true))
+      );
+
+      function inBounds(x, y, z) {
+        return x >= 0 && x < W && y >= 0 && y < D && z >= 0 && z < H;
+      }
+
+      function isOccupied(x, y, z) {
+        return inBounds(x, y, z) && grid[z][y][x];
+      }
+
+      function neighborCoords(x, y, z) {
+        return [
+          [x - 1, y, z], [x + 1, y, z],
+          [x, y - 1, z], [x, y + 1, z],
+          [x, y, z - 1], [x, y, z + 1],
+        ];
+      }
+
+      function countNeighbors(x, y, z) {
+        return neighborCoords(x, y, z).filter(([nx, ny, nz]) => isOccupied(nx, ny, nz)).length;
+      }
+
+      function canRemove(x, y, z) {
+        if (!isOccupied(x, y, z)) return false;
+        grid[z][y][x] = false;
+        let valid = true;
+
+        function firstOccupied() {
+          for (let z0 = 0; z0 < H; z0++) {
+            for (let y0 = 0; y0 < D; y0++) {
+              for (let x0 = 0; x0 < W; x0++) {
+                if (grid[z0][y0][x0]) return [x0, y0, z0];
+              }
+            }
+          }
+          return null;
+        }
+
+        const start = firstOccupied();
+        if (!start) {
+          grid[z][y][x] = true;
+          return false;
+        }
+
+        const seen = new Set();
+        const q = [start];
+        seen.add(start.join(','));
+
+        while (q.length) {
+          const [cx, cy, cz] = q.shift();
+          for (const [nx, ny, nz] of neighborCoords(cx, cy, cz)) {
+            const key = `${nx},${ny},${nz}`;
+            if (!isOccupied(nx, ny, nz) || seen.has(key)) continue;
+            seen.add(key);
+            q.push([nx, ny, nz]);
+          }
+        }
+
+        for (let zz = 0; zz < H && valid; zz++) {
+          for (let yy = 0; yy < D && valid; yy++) {
+            for (let xx = 0; xx < W && valid; xx++) {
+              if (!grid[zz][yy][xx]) continue;
+              const supported = zz === 0 || grid[zz - 1][yy][xx];
+              const attachedCount = countNeighbors(xx, yy, zz);
+              const connected = seen.has(`${xx},${yy},${zz}`);
+              if (!supported) valid = false;
+              if (attachedCount <= 2) valid = false;
+              if (!connected) valid = false;
+            }
+          }
+        }
+
+        grid[z][y][x] = true;
+        return valid;
+      }
+
+      function isEdgeCell(x, y, z) {
+        return x === 0 || x === W - 1 || y === 0 || y === D - 1 || z === 0 || z === H - 1;
+      }
+
+      function carvedSetForLayer(z) {
+        const set = new Set();
+        for (let y = 0; y < D; y++) {
+          for (let x = 0; x < W; x++) {
+            if (!grid[z][y][x]) set.add(`${x},${y}`);
+          }
+        }
+        return set;
+      }
+
+      function nearestEdgeDirection(x, y) {
+        const distances = [
+          { dir: [-1, 0], dist: x },
+          { dir: [1, 0], dist: W - 1 - x },
+          { dir: [0, -1], dist: y },
+          { dir: [0, 1], dist: D - 1 - y },
+        ].sort((a, b) => a.dist - b.dist);
+        return distances[0].dir;
+      }
+
+      function carveSlopePath(seedX, seedY, z) {
+        const path = [];
+        let x = seedX;
+        let y = seedY;
+        let guard = 0;
+        let momentum = nearestEdgeDirection(x, y);
+
+        while (!isEdgeCell(x, y, z) && guard < 100) {
+          guard++;
+          const preferred = nearestEdgeDirection(x, y);
+          if (Math.random() < settings.slopeAmt) momentum = preferred;
+
+          const side = momentum[0] !== 0
+            ? [momentum[0], Math.random() < 0.5 ? -1 : 1]
+            : [Math.random() < 0.5 ? -1 : 1, momentum[1]];
+
+          const candidates = [momentum, preferred, momentum, side, preferred];
+          let moved = false;
+
+          for (const [dx, dy] of candidates) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (!inBounds(nx, ny, z)) continue;
+            if (grid[z][ny][nx] && canRemove(nx, ny, z)) {
+              path.push({ x: nx, y: ny });
+              x = nx;
+              y = ny;
+              moved = true;
+              break;
+            }
+            if (!grid[z][ny][nx]) {
+              x = nx;
+              y = ny;
+              moved = true;
+              break;
+            }
+          }
+          if (!moved) break;
+        }
+
+        return path;
+      }
+
+      function growCluster(z, targetRemovals) {
+        const sx = Math.floor(Math.random() * W);
+        const sy = Math.floor(Math.random() * D);
+        const frontier = [{ x: sx, y: sy, w: 2 }];
+        const seen = new Set([`${sx},${sy}`]);
+        let removed = 0;
+
+        while (frontier.length && removed < targetRemovals) {
+          frontier.sort((a, b) => b.w - a.w);
+          const pickIndex = Math.floor(
+            Math.random() * Math.min(frontier.length, Math.max(1, Math.round(4 - settings.clusterAmt * 3)))
+          );
+          const current = frontier.splice(pickIndex, 1)[0];
+
+          if (grid[z][current.y][current.x] && canRemove(current.x, current.y, z)) {
+            grid[z][current.y][current.x] = false;
+            removed++;
+          }
+
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+          for (const [dx, dy] of dirs) {
+            const nx = current.x + dx;
+            const ny = current.y + dy;
+            const key = `${nx},${ny}`;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            let weight = 1;
+            for (const [adx, ady] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const ax = nx + adx;
+              const ay = ny + ady;
+              if (ax >= 0 && ax < W && ay >= 0 && ay < D && !grid[z][ay][ax]) weight += 1.5;
+            }
+            if (nx === 0 || nx === W - 1 || ny === 0 || ny === D - 1) weight *= 2;
+            frontier.push({ x: nx, y: ny, w: weight });
+          }
+        }
+      }
+
+      function connectMissingToEdge(z) {
+        const missing = carvedSetForLayer(z);
+        if (!missing.size) return;
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        const seen = new Set();
+        const components = [];
+
+        for (const key of missing) {
+          if (seen.has(key)) continue;
+          const [sx, sy] = key.split(',').map(Number);
+          const comp = [];
+          const q = [{ x: sx, y: sy }];
+          seen.add(key);
+
+          while (q.length) {
+            const cur = q.shift();
+            comp.push(cur);
+            for (const [dx, dy] of dirs) {
+              const nx = cur.x + dx;
+              const ny = cur.y + dy;
+              const nk = `${nx},${ny}`;
+              if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+              if (!missing.has(nk) || seen.has(nk)) continue;
+              seen.add(nk);
+              q.push({ x: nx, y: ny });
+            }
+          }
+          components.push(comp);
+        }
+
+        for (const comp of components) {
+          if (comp.some(c => isEdgeCell(c.x, c.y, z))) continue;
+          const start = comp[Math.floor(Math.random() * comp.length)];
+          const path = carveSlopePath(start.x, start.y, z);
+          for (const step of path) {
+            if (grid[z][step.y][step.x] && canRemove(step.x, step.y, z)) {
+              grid[z][step.y][step.x] = false;
+            }
+          }
+        }
+      }
+
+      function encourageSlopes() {
+        for (let z = H - 1; z >= 1; z--) {
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              if (!grid[z][y][x]) {
+                const options = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+                for (const [dx, dy] of options) {
+                  const nx = x + dx;
+                  const ny = y + dy;
+                  if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+                  if (grid[z - 1][ny][nx] && Math.random() < settings.slopeAmt && canRemove(nx, ny, z - 1)) {
+                    grid[z - 1][ny][nx] = false;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (let z = 0; z < H; z++) {
+        const topFactor = H === 1 ? 1 : z / (H - 1);
+        const removalShare = (1 - settings.topBias) + settings.topBias * topFactor;
+        const targetRemovals = Math.max(
+          2,
+          Math.min(W * D - 2, Math.round(W * D * settings.removeAmt * (0.35 + removalShare)))
+        );
+        growCluster(z, targetRemovals);
+        connectMissingToEdge(z);
+      }
+
+      encourageSlopes();
+
+      for (let pass = 0; pass < 3; pass++) {
+        for (let z = 0; z < H; z++) {
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              if (grid[z][y][x] && countNeighbors(x, y, z) <= 2 && canRemove(x, y, z)) {
+                grid[z][y][x] = false;
+              }
+            }
+          }
+        }
+      }
+
+      const occupied = [];
+      for (let z = 0; z < H; z++) {
+        for (let y = 0; y < D; y++) {
+          for (let x = 0; x < W; x++) {
+            if (grid[z][y][x]) occupied.push({ x, y, z });
+          }
+        }
+      }
+
+      return occupied;
+    }
+
+    function simplifyShape(occupiedData) {
+      const heights = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (const c of occupiedData) {
+        if (c.z > heights[c.y][c.x]) heights[c.y][c.x] = c.z;
+      }
+
+      const simple = [];
+      for (let y = 0; y < D; y++) {
+        for (let x = 0; x < W; x++) {
+          const h = heights[y][x];
+          if (h < 0) continue;
+          for (let z = 0; z <= h; z++) {
+            simple.push({ x, y, z });
+          }
+        }
+      }
+      return simple;
+    }
+
+    function buildMaps(occupiedData) {
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+
+      const topMap = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (let y = 0; y < D; y++) {
+        for (let x = 0; x < W; x++) {
+          for (let z = H - 1; z >= 0; z--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              topMap[y][x] = z;
+              break;
+            }
+          }
+        }
+      }
+
+      const frontMap = Array.from({ length: H }, () => Array(D).fill(null));
+      for (let z = 0; z < H; z++) {
+        for (let y = 0; y < D; y++) {
+          for (let x = W - 1; x >= 0; x--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              frontMap[z][y] = x;
+              break;
+            }
+          }
+        }
+      }
+
+      const leftMap = Array.from({ length: H }, () => Array(W).fill(null));
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          for (let y = D - 1; y >= 0; y--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              leftMap[z][x] = y;
+              break;
+            }
+          }
+        }
+      }
+
+      return { topMap, frontMap, leftMap, occupiedSet };
+    }
+
+    function transformProjectionMap(sourceMap, mode) {
+      const rotateMapCW = map => {
+        const oldRows = map.length;
+        const oldCols = map[0].length;
+        return Array.from({ length: oldCols }, (_, r) =>
+          Array.from({ length: oldRows }, (_, c) => map[oldRows - 1 - c][r])
+        );
+      };
+
+      return mode === 'front'
+        ? sourceMap.map(row => [...row].reverse())
+        : mode === 'top'
+          ? rotateMapCW(sourceMap)
+          : sourceMap;
+    }
+
+    function drawMapProjection(canvasEl, map, mode, sharedCell = null, hiddenSegments = []) {
+      if (!canvasEl) return;
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvasEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      canvasEl.width = Math.floor(rect.width * ratio);
+      canvasEl.height = Math.floor(rect.height * ratio);
+      const ctx = canvasEl.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const rows = map.length;
+      const cols = map[0].length;
+      const pad = 8;
+      const cell = sharedCell ?? Math.max(
+        8,
+        Math.min((rect.width - pad * 2) / cols, (rect.height - pad * 2) / rows)
+      );
+
+      const drawW = cols * cell;
+      const drawH = rows * cell;
+      const ox = (rect.width - drawW) / 2;
+      const oy = (rect.height - drawH) / 2;
+      const stroke = 'rgba(20,20,20,0.98)';
+      const fill = 'rgb(248,248,248)';
+      const hiddenStroke = 'rgba(70,70,70,0.82)';
+
+      function valueAt(r, c) {
+        if (r < 0 || c < 0 || r >= rows || c >= cols) return null;
+        return map[r][c];
+      }
+
+      function projectCell(r, c) {
+        if (mode === 'top') {
+          return { px: ox + c * cell, py: oy + r * cell };
+        }
+        return { px: ox + c * cell, py: oy + (rows - 1 - r) * cell };
+      }
+
+      function projectGridPoint(gx, gy) {
+        if (mode === 'top') {
+          return { px: ox + gx * cell, py: oy + gy * cell };
+        }
+        return { px: ox + gx * cell, py: oy + (rows - gy) * cell };
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+          const { px, py } = projectCell(r, c);
+          ctx.fillStyle = fill;
+          ctx.fillRect(px, py, cell, cell);
+        }
+      }
+
+      if (hiddenSegments.length) {
+        ctx.beginPath();
+        ctx.strokeStyle = hiddenStroke;
+        ctx.lineWidth = 1.1;
+        ctx.setLineDash([5, 4]);
+        for (const seg of hiddenSegments) {
+          const a = projectGridPoint(seg.x1, seg.y1);
+          const b = projectGridPoint(seg.x2, seg.y2);
+          ctx.moveTo(a.px, a.py);
+          ctx.lineTo(b.px, b.py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.6;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+
+          const { px, py } = projectCell(r, c);
+          const left = valueAt(r, c - 1);
+          const right = valueAt(r, c + 1);
+          const up = mode === 'top' ? valueAt(r - 1, c) : valueAt(r + 1, c);
+          const down = mode === 'top' ? valueAt(r + 1, c) : valueAt(r - 1, c);
+
+          if (left === null || left === -1 || left !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px, py + cell);
+          }
+          if (right === null || right === -1 || right !== val) {
+            ctx.moveTo(px + cell, py);
+            ctx.lineTo(px + cell, py + cell);
+          }
+          if (up === null || up === -1 || up !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px + cell, py);
+          }
+          if (down === null || down === -1 || down !== val) {
+            ctx.moveTo(px, py + cell);
+            ctx.lineTo(px + cell, py + cell);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    function dedupeSegments(segments) {
+      const seen = new Set();
+      const clean = [];
+      for (const seg of segments) {
+        const forward = `${seg.x1},${seg.y1},${seg.x2},${seg.y2}`;
+        const reverse = `${seg.x2},${seg.y2},${seg.x1},${seg.y1}`;
+        if (seen.has(forward) || seen.has(reverse)) continue;
+        seen.add(forward);
+        clean.push(seg);
+      }
+      return clean;
+    }
+
+    function transformSegments(segments, mode, rawRows, rawCols) {
+      if (mode === 'front') {
+        return dedupeSegments(segments.map(seg => ({
+          x1: rawCols - seg.x1,
+          y1: seg.y1,
+          x2: rawCols - seg.x2,
+          y2: seg.y2,
+        })));
+      }
+
+      if (mode === 'top') {
+        return dedupeSegments(segments.map(seg => ({
+          x1: rawRows - seg.y1,
+          y1: seg.x1,
+          x2: rawRows - seg.y2,
+          y2: seg.x2,
+        })));
+      }
+
+      return dedupeSegments(segments.map(seg => ({ ...seg })));
+    }
+
+    function computeHiddenSegments(occupiedSet, mode) {
+      const segments = [];
+      const has = (x, y, z) => occupiedSet.has(`${x},${y},${z}`);
+
+      if (mode === 'front') {
+        const nearest = (y, z) => {
+          for (let x = W - 1; x >= 0; x--) if (has(x, y, z)) return x;
+          return null;
+        };
+
+        for (let z = 0; z < H; z++) {
+          for (let yBoundary = 0; yBoundary <= D; yBoundary++) {
+            let hasDeeperBoundary = false;
+            for (let x = 0; x < W; x++) {
+              const left = yBoundary > 0 ? has(x, yBoundary - 1, z) : false;
+              const right = yBoundary < D ? has(x, yBoundary, z) : false;
+              if (left !== right) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const leftVisible = yBoundary > 0 ? nearest(yBoundary - 1, z) : null;
+            const rightVisible = yBoundary < D ? nearest(yBoundary, z) : null;
+            if (leftVisible === rightVisible && hasDeeperBoundary) {
+              segments.push({ x1: yBoundary, y1: z, x2: yBoundary, y2: z + 1 });
+            }
+          }
+        }
+
+        for (let zBoundary = 0; zBoundary <= H; zBoundary++) {
+          for (let y = 0; y < D; y++) {
+            let hasDeeperBoundary = false;
+            for (let x = 0; x < W; x++) {
+              const below = zBoundary > 0 ? has(x, y, zBoundary - 1) : false;
+              const above = zBoundary < H ? has(x, y, zBoundary) : false;
+              if (below !== above) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const belowVisible = zBoundary > 0 ? nearest(y, zBoundary - 1) : null;
+            const aboveVisible = zBoundary < H ? nearest(y, zBoundary) : null;
+            if (belowVisible === aboveVisible && hasDeeperBoundary) {
+              segments.push({ x1: y, y1: zBoundary, x2: y + 1, y2: zBoundary });
+            }
+          }
+        }
+
+        return segments;
+      }
+
+      if (mode === 'left') {
+        const nearest = (x, z) => {
+          for (let y = D - 1; y >= 0; y--) if (has(x, y, z)) return y;
+          return null;
+        };
+
+        for (let z = 0; z < H; z++) {
+          for (let xBoundary = 0; xBoundary <= W; xBoundary++) {
+            let hasDeeperBoundary = false;
+            for (let y = 0; y < D; y++) {
+              const left = xBoundary > 0 ? has(xBoundary - 1, y, z) : false;
+              const right = xBoundary < W ? has(xBoundary, y, z) : false;
+              if (left !== right) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const leftVisible = xBoundary > 0 ? nearest(xBoundary - 1, z) : null;
+            const rightVisible = xBoundary < W ? nearest(xBoundary, z) : null;
+            if (leftVisible === rightVisible && hasDeeperBoundary) {
+              segments.push({ x1: xBoundary, y1: z, x2: xBoundary, y2: z + 1 });
+            }
+          }
+        }
+
+        for (let zBoundary = 0; zBoundary <= H; zBoundary++) {
+          for (let x = 0; x < W; x++) {
+            let hasDeeperBoundary = false;
+            for (let y = 0; y < D; y++) {
+              const below = zBoundary > 0 ? has(x, y, zBoundary - 1) : false;
+              const above = zBoundary < H ? has(x, y, zBoundary) : false;
+              if (below !== above) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const belowVisible = zBoundary > 0 ? nearest(x, zBoundary - 1) : null;
+            const aboveVisible = zBoundary < H ? nearest(x, zBoundary) : null;
+            if (belowVisible === aboveVisible && hasDeeperBoundary) {
+              segments.push({ x1: x, y1: zBoundary, x2: x + 1, y2: zBoundary });
+            }
+          }
+        }
+
+        return segments;
+      }
+
+      const nearest = (x, y) => {
+        for (let z = H - 1; z >= 0; z--) if (has(x, y, z)) return z;
+        return null;
+      };
+
+      for (let y = 0; y < D; y++) {
+        for (let xBoundary = 0; xBoundary <= W; xBoundary++) {
+          let hasDeeperBoundary = false;
+          for (let z = 0; z < H; z++) {
+            const left = xBoundary > 0 ? has(xBoundary - 1, y, z) : false;
+            const right = xBoundary < W ? has(xBoundary, y, z) : false;
+            if (left !== right) {
+              hasDeeperBoundary = true;
+              break;
+            }
+          }
+          const leftVisible = xBoundary > 0 ? nearest(xBoundary - 1, y) : null;
+          const rightVisible = xBoundary < W ? nearest(xBoundary, y) : null;
+          if (leftVisible === rightVisible && hasDeeperBoundary) {
+            segments.push({ x1: xBoundary, y1: y, x2: xBoundary, y2: y + 1 });
+          }
+        }
+      }
+
+      for (let yBoundary = 0; yBoundary <= D; yBoundary++) {
+        for (let x = 0; x < W; x++) {
+          let hasDeeperBoundary = false;
+          for (let z = 0; z < H; z++) {
+            const below = yBoundary > 0 ? has(x, yBoundary - 1, z) : false;
+            const above = yBoundary < D ? has(x, yBoundary, z) : false;
+            if (below !== above) {
+              hasDeeperBoundary = true;
+              break;
+            }
+          }
+          const belowVisible = yBoundary > 0 ? nearest(x, yBoundary - 1) : null;
+          const aboveVisible = yBoundary < D ? nearest(x, yBoundary) : null;
+          if (belowVisible === aboveVisible && hasDeeperBoundary) {
+            segments.push({ x1: x, y1: yBoundary, x2: x + 1, y2: yBoundary });
+          }
+        }
+      }
+
+      return segments;
+    }
+
+    function makeSignature(occupiedData) {
+      return occupiedData.map(c => `${c.x},${c.y},${c.z}`).sort().join('|');
+    }
+
+    function buildDistinctBlocks(count) {
+      const blocks = [];
+      const signatures = new Set();
+      let guard = 0;
+
+      while (blocks.length < count && guard < 300) {
+        guard++;
+        const raw = buildAssembly(PRESET);
+        const simple = simplifyShape(raw);
+        const signature = makeSignature(simple);
+        if (signatures.has(signature)) continue;
+        signatures.add(signature);
+        blocks.push({
+          id: blocks.length + 1,
+          letter: BLOCK_LETTERS[blocks.length],
+          occupied: simple,
+          maps: buildMaps(simple),
+        });
+      }
+
+      return blocks;
+    }
+
+    function makeViewTiles(blocks) {
+      const tiles = [];
+      for (const block of blocks) {
+        const frontMap = transformProjectionMap(block.maps.frontMap, 'front');
+        const leftMap = transformProjectionMap(block.maps.leftMap, 'left');
+        const topMap = transformProjectionMap(block.maps.topMap, 'top');
+
+        tiles.push({
+          uid: `${block.letter}-front`,
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'front',
+          map: frontMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'front'),
+            'front',
+            block.maps.frontMap.length,
+            block.maps.frontMap[0].length
+          ),
+          matched: false,
+          missed: false,
+        });
+        tiles.push({
+          uid: `${block.letter}-left`,
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'left',
+          map: leftMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'left'),
+            'left',
+            block.maps.leftMap.length,
+            block.maps.leftMap[0].length
+          ),
+          matched: false,
+          missed: false,
+        });
+        tiles.push({
+          uid: `${block.letter}-top`,
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'top',
+          map: topMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'top'),
+            'top',
+            block.maps.topMap.length,
+            block.maps.topMap[0].length
+          ),
+          matched: false,
+          missed: false,
+        });
+      }
+      return shuffle(tiles);
+    }
+
+    function formatMs(ms) {
+      const safe = Math.max(0, ms);
+      const totalSeconds = Math.floor(safe / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function titleCase(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function buildSheet() {
+      const blocks = buildDistinctBlocks(BLOCK_COUNT).map(block => ({
+        ...block,
+        matchedModes: new Set(),
+        done: false,
+      }));
+      const tiles = makeViewTiles(blocks);
+      return { blocks, tiles };
+    }
+
+    function getModeLabel() {
+      return state.mode === 'sheet' ? 'Fastest sheet' : '10-minute sprint';
+    }
+
+    function updateHeaderDisplays() {
+      els.studentDisplay.textContent = state.player.name || '—';
+      els.classDisplay.textContent = state.player.className || '—';
+      els.modeDisplay.textContent = state.running ? getModeLabel() : 'Setup';
+    }
+
+    function setMessage(text, tone = '') {
+      els.messageBar.textContent = text;
+      els.messageBar.className = `messageBar${tone ? ` ${tone}` : ''}`;
+    }
+
+    function showToast(text) {
+      els.toast.textContent = text;
+      els.toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => els.toast.classList.remove('show'), 1700);
+    }
+
+    function getCurrentBlock() {
+      return state.currentSheet?.blocks.find(block => block.id === state.currentBlockId) || null;
+    }
+
+    function getBlockProgress(block) {
+      return block ? block.matchedModes.size : 0;
+    }
+
+    function getSelectedTiles() {
+      return state.currentSheet.tiles.filter(tile => state.selectedTiles.includes(tile.uid));
+    }
+
+    function chooseNextIncompleteBlock() {
+      const next = state.currentSheet.blocks.find(block => !block.done);
+      if (next) state.currentBlockId = next.id;
+    }
+
+    function renderTargetGrid() {
+      els.targetGrid.innerHTML = '';
+      for (const block of state.currentSheet.blocks) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `targetCard${block.id === state.currentBlockId ? ' current' : ''}${block.done ? ' done' : ''}`;
+        card.innerHTML = `
+          <canvas></canvas>
+          <div class="targetMeta">
+            <span>Block ${block.letter}</span>
+            <span>${getBlockProgress(block)} / 3</span>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          if (!state.running || state.finished || block.done) return;
+          state.currentBlockId = block.id;
+          state.selectedTiles = [];
+          renderAll();
+          setMessage(`Now working on block ${block.letter}. Select up to 3 matching views.`, '');
+        });
+        els.targetGrid.appendChild(card);
+        renderIsoCanvas(card.querySelector('canvas'), block.occupied);
+      }
+    }
+
+    function renderFocusBlock() {
+      const block = getCurrentBlock();
+      if (!block) return;
+      els.focusTitle.textContent = `Block ${block.letter}`;
+      els.focusStatus.textContent = `${getBlockProgress(block)} / 3 matched`;
+      renderIsoCanvas(els.focusCanvas, block.occupied);
+    }
+
+    function renderViewGrid() {
+      els.viewGrid.innerHTML = '';
+      const activeBlock = getCurrentBlock();
+      const sharedProjectionCell = Math.max(
+        8,
+        Math.min(...state.currentSheet.tiles.map(() => 18))
+      );
+
+      state.currentSheet.tiles.forEach((tile, index) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        const isSelected = state.selectedTiles.includes(tile.uid);
+        const isCorrect = tile.matched;
+        const isMissed = tile.missed;
+        const disabled = isCorrect;
+        card.className = `viewCard${isSelected ? ' selected' : ''}${isCorrect ? ' correct' : ''}${isMissed ? ' missed' : ''}${disabled ? ' disabled' : ''}`;
+        card.innerHTML = `
+          <div class="viewCardHeader">
+            <div class="viewNum">View ${index + 1}</div>
+            <div class="viewTag">${titleCase(tile.mode)}</div>
+          </div>
+          <canvas></canvas>
+          <div class="viewFoot">Choose if this belongs to block ${activeBlock.letter}.</div>
+        `;
+
+        card.addEventListener('click', () => {
+          if (!state.running || state.finished || tile.matched) return;
+          toggleTileSelection(tile.uid);
+        });
+
+        els.viewGrid.appendChild(card);
+        drawMapProjection(card.querySelector('canvas'), tile.map, tile.mode, sharedProjectionCell, tile.hiddenSegments || []);
+      });
+    }
+
+    function updateStats() {
+      els.correctDisplay.textContent = String(state.correct);
+      els.wrongDisplay.textContent = String(state.wrong);
+      els.sheetDisplay.textContent = String(state.sheetsCompleted);
+      els.selectionInfo.textContent = `Selected ${state.selectedTiles.length} of 3 cards for block ${getCurrentBlock().letter}.`;
+      els.roundInfo.textContent = state.mode === 'sheet'
+        ? `Finish sheet ${state.currentSheetNumber} as fast as possible. Current block: ${getCurrentBlock().letter}.`
+        : `Complete as many sheets as possible before time runs out. Current sheet: ${state.currentSheetNumber}.`;
+    }
+
+    function renderAll() {
+      if (!state.currentSheet) return;
+      renderTargetGrid();
+      renderFocusBlock();
+      renderViewGrid();
+      updateStats();
+      updateHeaderDisplays();
+      els.checkBtn.disabled = state.selectedTiles.length === 0 || state.finished;
+      els.clearBtn.disabled = state.selectedTiles.length === 0 || state.finished;
+    }
+
+    function toggleTileSelection(uid) {
+      const selected = new Set(state.selectedTiles);
+      if (selected.has(uid)) {
+        selected.delete(uid);
+      } else {
+        if (selected.size >= 3) {
+          setMessage('You can only pick 3 cards at a time.', 'warn');
+          return;
+        }
+        selected.add(uid);
+      }
+      state.selectedTiles = [...selected];
+      renderAll();
+    }
+
+    function startTimer() {
+      clearInterval(state.timerHandle);
+      state.startTime = Date.now();
+      state.endTime = 0;
+      state.sprintTimeLeft = state.sprintDurationMs;
+      state.timerHandle = setInterval(() => {
+        if (!state.running) return;
+        const now = Date.now();
+        if (state.mode === 'sheet') {
+          els.timerDisplay.textContent = formatMs(now - state.startTime);
+        } else {
+          state.sprintTimeLeft = Math.max(0, state.sprintDurationMs - (now - state.startTime));
+          els.timerDisplay.textContent = formatMs(state.sprintTimeLeft);
+          if (state.sprintTimeLeft <= 0) {
+            finishRound('Time is up.');
+          }
+        }
+      }, 200);
+    }
+
+    function stopTimer() {
+      clearInterval(state.timerHandle);
+      state.timerHandle = null;
+      state.endTime = Date.now();
+      if (state.mode === 'sheet') {
+        els.timerDisplay.textContent = formatMs(state.endTime - state.startTime);
+      } else {
+        const remaining = Math.max(0, state.sprintDurationMs - (state.endTime - state.startTime));
+        state.sprintTimeLeft = remaining;
+        els.timerDisplay.textContent = formatMs(remaining);
+      }
+    }
+
+    function startRound() {
+      const playerName = (els.studentName.value || '').trim();
+      const className = (els.studentClass.value || '').trim();
+      if (!playerName || !className) {
+        setMessage('Enter both student name and class before starting.', 'warn');
+        return;
+      }
+
+      state.player.name = playerName;
+      state.player.className = className;
+      state.mode = document.querySelector('input[name="gameMode"]:checked').value;
+      state.running = true;
+      state.finished = false;
+      state.currentSheetNumber = 1;
+      state.sheetsCompleted = 0;
+      state.correct = 0;
+      state.wrong = 0;
+      state.selectedTiles = [];
+      state.currentSheet = buildSheet();
+      state.currentBlockId = 1;
+
+      els.setupScreen.classList.add('hidden');
+      els.gameScreen.classList.add('active');
+      els.resultOverlay.classList.remove('show');
+      updateHeaderDisplays();
+      renderAll();
+      startTimer();
+      setMessage(state.mode === 'sheet'
+        ? 'The timer is running. Complete all six blocks as fast as you can.'
+        : 'The 10-minute sprint has started. Keep matching views and move through sheets quickly.', '');
+    }
+
+    function clearSelection() {
+      state.selectedTiles = [];
+      renderAll();
+      setMessage('Selections cleared.', '');
+    }
+
+    function clearMissedFlagsSoon() {
+      clearTimeout(clearMissedFlagsSoon.timer);
+      clearMissedFlagsSoon.timer = setTimeout(() => {
+        if (!state.currentSheet) return;
+        state.currentSheet.tiles.forEach(tile => { tile.missed = false; });
+        renderAll();
+      }, 650);
+    }
+
+    function processSelection() {
+      if (!state.running || state.finished || state.selectedTiles.length === 0) return;
+      const block = getCurrentBlock();
+      const tiles = getSelectedTiles();
+      let gained = 0;
+      let mistakes = 0;
+
+      tiles.forEach(tile => {
+        if (tile.blockId === block.id && !block.matchedModes.has(tile.mode)) {
+          tile.matched = true;
+          tile.missed = false;
+          block.matchedModes.add(tile.mode);
+          gained += 1;
+        } else {
+          tile.missed = true;
+          mistakes += 1;
+        }
+      });
+
+      state.correct += gained;
+      state.wrong += mistakes;
+      state.selectedTiles = [];
+
+      let message = '';
+      let tone = '';
+      if (gained && !mistakes) {
+        message = `Nice work. ${gained} correct ${gained === 1 ? 'view' : 'views'} locked in for block ${block.letter}.`;
+        tone = 'good';
+      } else if (gained && mistakes) {
+        message = `${gained} correct locked in, but ${mistakes} wrong ${mistakes === 1 ? 'guess' : 'guesses'} went back.`;
+        tone = 'warn';
+      } else {
+        message = `${mistakes} wrong ${mistakes === 1 ? 'guess' : 'guesses'}. Try again for block ${block.letter}.`;
+        tone = 'bad';
+      }
+
+      if (block.matchedModes.size === 3 && !block.done) {
+        block.done = true;
+        showToast(`Block ${block.letter} complete`);
+        if (state.currentSheet.blocks.every(b => b.done)) {
+          state.sheetsCompleted += 1;
+          if (state.mode === 'sheet') {
+            renderAll();
+            setMessage('Sheet complete.', 'good');
+            finishRound('Sheet complete.');
+            return;
+          }
+
+          message = `Sheet ${state.currentSheetNumber} complete. New sheet loaded.`;
+          tone = 'good';
+          state.currentSheetNumber += 1;
+          state.currentSheet = buildSheet();
+          state.currentBlockId = 1;
+        } else {
+          chooseNextIncompleteBlock();
+        }
+      }
+
+      setMessage(message, tone);
+      clearMissedFlagsSoon();
+      renderAll();
+    }
+
+    function finishRound(reason = 'Round complete.') {
+      if (!state.running || state.finished) return;
+      state.finished = true;
+      state.running = false;
+      stopTimer();
+      updateHeaderDisplays();
+
+      const elapsedMs = state.endTime - state.startTime;
+      const timerText = state.mode === 'sheet'
+        ? formatMs(elapsedMs)
+        : formatMs(Math.min(elapsedMs, state.sprintDurationMs));
+      const net = state.correct - state.wrong;
+
+      els.resultTitle.textContent = state.mode === 'sheet' ? 'Sheet finished' : 'Sprint finished';
+      els.resultIntro.textContent = reason;
+      els.resultStudent.textContent = state.player.name;
+      els.resultClass.textContent = state.player.className;
+      els.resultMode.textContent = getModeLabel();
+      els.resultTimer.textContent = timerText;
+      els.resultCorrect.textContent = String(state.correct);
+      els.resultWrong.textContent = String(state.wrong);
+      els.resultNet.textContent = String(net);
+      els.resultSheets.textContent = String(state.sheetsCompleted);
+
+      const resultLine = state.mode === 'sheet'
+        ? `${state.player.name} (${state.player.className}) finished 1 sheet in ${timerText} with ${state.correct} correct and ${state.wrong} wrong guesses.`
+        : `${state.player.name} (${state.player.className}) completed ${state.sheetsCompleted} ${state.sheetsCompleted === 1 ? 'sheet' : 'sheets'} in ${timerText} with a net score of ${net}.`; 
+      els.resultLine.textContent = resultLine;
+      els.resultOverlay.classList.add('show');
+      setMessage(reason, 'good');
+      els.checkBtn.disabled = true;
+      els.clearBtn.disabled = true;
+    }
+
+    function resetToSetup() {
+      stopTimer();
+      state.running = false;
+      state.finished = false;
+      state.currentSheet = null;
+      state.selectedTiles = [];
+      els.gameScreen.classList.remove('active');
+      els.setupScreen.classList.remove('hidden');
+      els.resultOverlay.classList.remove('show');
+      els.timerDisplay.textContent = '00:00';
+      els.correctDisplay.textContent = '0';
+      els.wrongDisplay.textContent = '0';
+      els.sheetDisplay.textContent = '0';
+      setMessage('Ready for the next student.', '');
+      updateHeaderDisplays();
+    }
+
+    els.startBtn.addEventListener('click', startRound);
+    els.demoBtn.addEventListener('click', () => {
+      els.studentName.value = 'Sample Student';
+      els.studentClass.value = 'Tech 10';
+      setMessage('Demo details added. Press Start round when ready.', '');
+    });
+    els.checkBtn.addEventListener('click', processSelection);
+    els.clearBtn.addEventListener('click', clearSelection);
+    els.endBtn.addEventListener('click', () => finishRound('Round ended early.'));
+    els.playAgainBtn.addEventListener('click', resetToSetup);
+    els.closeOverlayBtn.addEventListener('click', () => els.resultOverlay.classList.remove('show'));
+    window.addEventListener('resize', () => {
+      if (state.currentSheet && !els.setupScreen.classList.contains('hidden')) return;
+      if (state.currentSheet) renderAll();
+    });
+
+    updateHeaderDisplays();
+    setMessage('Enter student details, choose a mode, and start the round.', '');
+  </script>
+</body>
+</html>
