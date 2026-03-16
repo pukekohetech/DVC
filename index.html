@@ -1,206 +1,367 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>PHS Whiteboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PHS Whiteboard</title>
 
-<link rel="stylesheet" href="styles.css" />
-<link rel="stylesheet" href="whiteboard.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="whiteboard.css" />
 
-<style>
-/* -------- PAGE LINKS BUTTON -------- */
+  <style>
+    .pagesBtn{
+      position:absolute;
+      top:14px;
+      right:64px;
+      z-index:30;
+      width:42px;
+      height:42px;
+      border:none;
+      border-radius:999px;
+      background:rgba(255,255,255,.9);
+      box-shadow:0 8px 24px rgba(0,0,0,.16);
+      cursor:pointer;
+      font-size:18px;
+      backdrop-filter:blur(8px);
+    }
 
-.pagesBtn{
-  position:absolute;
-  top:14px;
-  right:64px;
-  z-index:30;
-  width:42px;
-  height:42px;
-  border:none;
-  border-radius:999px;
-  background:rgba(255,255,255,.9);
-  box-shadow:0 8px 24px rgba(0,0,0,.16);
-  cursor:pointer;
-  font-size:18px;
-  backdrop-filter:blur(8px);
-}
+    .pagesBtn:hover{
+      background:#fff;
+      transform:translateY(-1px);
+    }
 
-.pagesBtn:hover{
-  background:#fff;
-  transform:translateY(-1px);
-}
+    .pagesPop{
+      position:absolute;
+      top:62px;
+      right:14px;
+      z-index:31;
+      min-width:220px;
+      padding:8px;
+      border-radius:16px;
+      background:rgba(255,255,255,.96);
+      box-shadow:0 16px 40px rgba(0,0,0,.18);
+      backdrop-filter:blur(10px);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
 
-/* -------- PAGE POPUP -------- */
+    .pagesPop a{
+      display:block;
+      padding:10px 12px;
+      border-radius:10px;
+      color:#111;
+      text-decoration:none;
+      font-size:14px;
+    }
 
-.pagesPop{
-  position:absolute;
-  top:62px;
-  right:14px;
-  z-index:31;
-  min-width:220px;
-  padding:8px;
-  border-radius:16px;
-  background:rgba(255,255,255,.96);
-  box-shadow:0 16px 40px rgba(0,0,0,.18);
-  backdrop-filter:blur(10px);
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-
-.pagesPop a{
-  display:block;
-  padding:10px 12px;
-  border-radius:10px;
-  color:#111;
-  text-decoration:none;
-  font-size:14px;
-}
-
-.pagesPop a:hover{
-  background:rgba(0,0,0,.06);
-}
-
-.is-hidden{
-  display:none !important;
-}
-</style>
-
+    .pagesPop a:hover{
+      background:rgba(0,0,0,.06);
+    }
+  </style>
 </head>
 
 <body class="page-whiteboard">
+  <div class="toast" id="toast" aria-live="polite">Saved</div>
 
-<div class="toast" id="toast" aria-live="polite">Saved</div>
+  <main class="wb">
+    <aside class="dock" aria-label="Tools">
+      <div class="dockPopWrap">
+        <button class="dockBtn dockBtn--swatch" id="colorBtn" type="button" title="Colour + Brush size">
+          <span class="swatchLive" id="swatchLive" aria-hidden="true"></span>
+        </button>
 
-<main class="wb">
+        <div class="dockPop is-hidden" id="colorPop" role="dialog" aria-label="Colour and brush size">
+          <div class="dockPop__row">
+            <label class="dockPop__label" for="colorInput">Colour</label>
+            <input id="colorInput" type="color" value="#111111" class="dockPop__color" />
+          </div>
 
-<!-- LEFT TOOLBAR -->
+          <div class="dockPop__row">
+            <label class="dockPop__label" for="brushSize">Brush size</label>
+            <input id="brushSize" type="range" min="1" max="60" value="5" class="dockPop__range" />
+            <span id="brushOut" class="dockPop__pill">5</span>
+          </div>
 
-<aside class="dock" aria-label="Tools">
+          <div class="dockPop__row">
+            <label class="dockPop__label" for="opacityRange">Opacity</label>
+            <input id="opacityRange" type="range" min="0.05" max="1" step="0.01" value="1" class="dockPop__range" />
+            <span id="opacityOut" class="dockPop__pill">100%</span>
+          </div>
 
-<button class="dockBtn is-active" data-tool="pen" title="Freehand (P)">✏️</button>
-<button class="dockBtn" data-tool="line" title="Line (L)">／</button>
-<button class="dockBtn" data-tool="rect" title="Rectangle (R)">▭</button>
-<button class="dockBtn" data-tool="circle" title="Circle (C)">◯</button>
-<button class="dockBtn" data-tool="arc" title="Arc (G)">⌒</button>
-<button class="dockBtn" data-tool="arrow" title="Arrow (A)">➤</button>
-<button class="dockBtn" data-tool="text" title="Text (T)">T</button>
-<button class="dockBtn" data-tool="eraser" title="Eraser (E)">🧽</button>
+          <div class="dockPop__section">
+            <div class="dockPop__subhead">Presets</div>
+            <div class="presetRow presetRow--triple">
+              <button type="button" class="panel__btn" id="presetConstruction">Construction</button>
+              <button type="button" class="panel__btn" id="presetOutline">Outline</button>
+              <button type="button" class="panel__btn" id="presetColour">Fill</button>
+            </div>
+            <div class="presetRow presetRow--triple">
+              <button type="button" class="panel__btn" id="presetReference">Reference</button>
+              <button type="button" class="panel__btn" id="presetHidden">Hidden</button>
+              <button type="button" class="panel__btn" id="presetCenter">Center</button>
+            </div>
+            <div class="dockPop__note">Construction + Outline use black automatically.</div>
+            <div class="dockPop__note">Reference, Hidden, and Center use the line options below.</div>
+          </div>
 
-<div class="dockSep"></div>
+          <div class="dockPop__section">
+            <div class="dockPop__subhead">Line style</div>
+            <div class="presetRow lineStyleRow lineStyleRow--four">
+              <button type="button" class="panel__btn panel__btn--lineStyle" id="lineStyleSolid" title="Solid line" aria-label="Solid line">
+                <span class="lineIcon lineIcon--solid" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="panel__btn panel__btn--lineStyle" id="lineStyleReference" title="Reference line" aria-label="Reference line">
+                <span class="lineIcon lineIcon--reference" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="panel__btn panel__btn--lineStyle" id="lineStyleHidden" title="Hidden line" aria-label="Hidden line">
+                <span class="lineIcon lineIcon--hidden" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="panel__btn panel__btn--lineStyle" id="lineStyleCenter" title="Center line" aria-label="Center line">
+                <span class="lineIcon lineIcon--center" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="dockPop__note">Solid • Reference • Hidden • Center. Snapping still uses the true line/curve geometry.</div>
+            <div class="dockPop__note">Right-click: finish PolyFill • reset Arc</div>
+          </div>
 
-<button class="dockBtn" id="undoBtn">↶</button>
-<button class="dockBtn" id="redoBtn">↷</button>
+          <div class="dockPop__section">
+            <div class="dockPop__subhead">Quick colours</div>
+            <div class="colorPalette" aria-label="Quick colours">
+              <button type="button" data-col="#111111" title="Black" style="background:#111111;"></button>
+              <button type="button" data-col="#ffffff" title="White" style="background:#ffffff; border:1px solid rgba(0,0,0,.2);"></button>
+              <button type="button" data-col="#d32f2f" title="Red" style="background:#d32f2f;"></button>
+              <button type="button" data-col="#f57c00" title="Orange" style="background:#f57c00;"></button>
+              <button type="button" data-col="#fbc02d" title="Yellow" style="background:#fbc02d;"></button>
+              <button type="button" data-col="#388e3c" title="Green" style="background:#388e3c;"></button>
+              <button type="button" data-col="#1976d2" title="Blue" style="background:#1976d2;"></button>
+              <button type="button" data-col="#7b1fa2" title="Purple" style="background:#7b1fa2;"></button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-<div class="dockSep"></div>
+      <div class="dockSep"></div>
 
-<button class="dockBtn dockBtn--danger" id="clearBtn">🗑</button>
+      <button class="dockBtn" data-tool="select" type="button" title="Select / Move (V)">🖱️</button>
 
-</aside>
+      <div class="dockSep"></div>
 
-<!-- STAGE -->
+      <button class="dockBtn is-active" data-tool="pen" type="button" title="Freehand (P)">✏️</button>
+      <button class="dockBtn" data-tool="line" type="button" title="Line (L)">／</button>
+      <button class="dockBtn" data-tool="rect" type="button" title="Rectangle (R)">▭</button>
+      <button class="dockBtn" data-tool="circle" type="button" title="Circle (C)">◯</button>
+      <button class="dockBtn" data-tool="arc" type="button" title="Arc (G)">⌒</button>
+      <button class="dockBtn" data-tool="arrow" type="button" title="Arrow (A)">➤</button>
+      <button class="dockBtn" data-tool="text" type="button" title="Text (T)">T</button>
+      <button class="dockBtn" data-tool="eraser" type="button" title="Eraser (E)">🧽</button>
+      <button class="dockBtn" data-tool="polyFill" type="button" title="Polygon Fill (K)">⬠</button>
 
-<section class="stageWrap">
+      <button class="dockBtn" id="undoBtn" type="button" title="Undo">↶</button>
+      <button class="dockBtn" id="redoBtn" type="button" title="Redo">↷</button>
 
-<div class="stage" id="stage">
+      <div class="dockSep"></div>
 
-<div id="bgLayer">
-<img id="bgImg" draggable="false" />
-</div>
+      <button class="dockBtn" data-tool="bgMove" type="button" title="Move selection / background">↔</button>
+      <button class="dockBtn" data-tool="bgScale" type="button" title="Scale selection / background">⤡</button>
+      <button class="dockBtn" data-tool="bgRotate" type="button" title="Rotate selection / background">⟲</button>
 
-<canvas id="inkCanvas"></canvas>
-<canvas id="uiCanvas"></canvas>
+      <div class="dockSep"></div>
 
-<!-- PAGE MENU BUTTON -->
+      <button class="dockBtn" id="setScaleBtn" type="button" title="Set scale from selected line">📏</button>
 
-<button
-class="pagesBtn"
-id="pagesBtn"
-title="Other pages"
->☰</button>
+      <div class="dockSep"></div>
 
-<nav class="pagesPop is-hidden" id="pagesPop">
+      <button class="dockBtn dockBtn--danger" id="clearBtn" type="button" title="Clear ink (returns to Pen)">🗑</button>
+    </aside>
 
-<a href="index.html">Whiteboard</a>
+    <section class="stageWrap">
+      <div class="stage" id="stage" aria-label="Whiteboard stage">
+        <div id="bgLayer" aria-hidden="true">
+          <img id="bgImg" alt="" draggable="false" />
+        </div>
 
-<a href="GridGenerate.html">Grid Generator</a>
+        <canvas id="inkCanvas"></canvas>
+        <canvas id="uiCanvas"></canvas>
 
-<a href="OtrhotoIsoSheets.html">Orthographic → Isometric Sheets</a>
+        <button
+          class="pagesBtn"
+          id="pagesBtn"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          title="Other pages"
+        >☰</button>
 
-<a href="iso-reliever-pack-generator.html">
-Iso Reliever Pack Generator
-</a>
+        <nav class="pagesPop is-hidden" id="pagesPop" aria-label="Site pages">
+          <a href="index.html">Whiteboard</a>
+          <a href="GridGenerate.html">Grid Generator</a>
+          <a href="OtrhotoIsoSheets.html">Orthographic → Isometric Sheets</a>
+          <a href="iso-reliever-pack-generator.html">Iso Reliever Pack</a>
+          <a href="orthographic-to-isometric-challenge.html">Ortho → Iso Challenge</a>
+          <a href="simple_isometric.html">Simple Isometric</a>
+          <a href="isometric-orthographic-Match-Challenge.html">Iso ↔ Ortho Match</a>
+        </nav>
 
-<a href="orthographic-to-isometric-challenge.html">
-Orthographic → Isometric Challenge
-</a>
+        <button
+          class="gearBtn"
+          id="settingsBtn"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          title="Board menu"
+        >⚙️</button>
 
-<a href="simple_isometric.html">
-Simple Isometric
-</a>
+        <div class="panel is-hidden" id="settingsPanel" role="dialog" aria-label="Board menu">
+          <div class="panel__top">
+            <div class="panel__title">Board</div>
+            <button class="panel__close" id="settingsCloseBtn" type="button" title="Close">✕</button>
+          </div>
 
-<a href="isometric-orthographic-Match-Challenge.html">
-Isometric ↔ Orthographic Match
-</a>
+          <div class="panel__grid">
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label" for="titleInput">Title</label>
+              <div class="panel__row">
+                <input id="titleInput" class="panel__input" type="text" placeholder="Add a heading…" />
+                <button id="applyTitleBtn" class="panel__btn" type="button">Apply</button>
+              </div>
+            </div>
 
-</nav>
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label" for="bgFile">Background</label>
+              <div class="panel__row panel__row--wrap">
+                <input id="bgFile" type="file" accept="image/*" class="panel__file" />
+                <button id="clearBgBtn" class="panel__btn" type="button">Clear</button>
+              </div>
+              <div class="panel__note">Use ↔ ⤡ ⟲ on the left to move, scale, or rotate it.</div>
+            </div>
 
-<!-- SETTINGS BUTTON -->
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label" for="svgInkFile">Presentation</label>
+              <div class="panel__row panel__row--wrap">
+                <input id="svgInkFile" type="file" accept="image/svg+xml,.svg" class="panel__file" />
+                <button id="clearSvgInkBtn" class="panel__btn" type="button">Clear</button>
+              </div>
+              <div class="panel__note">. next • , back • Shift + &gt; play • Shift + &lt; timing</div>
+            </div>
 
-<button
-class="gearBtn"
-id="settingsBtn"
-title="Board menu"
->⚙️</button>
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label">Boards</label>
+              <div class="panel__row panel__row--wrap">
+                <select id="boardSelect" class="panel__select"></select>
+                <button id="newBoardBtn" class="panel__btn" type="button">New</button>
+                <button id="saveBoardBtn" class="panel__btn" type="button">Save</button>
+                <button id="loadBoardBtn" class="panel__btn" type="button">Load</button>
+              </div>
+              <div class="panel__row panel__row--wrap">
+                <button id="deleteBoardBtn" class="panel__btn panel__btn--danger" type="button">Delete</button>
+                <button id="deleteAllBoardsBtn" class="panel__btn panel__btn--danger" type="button">Delete all</button>
+              </div>
+            </div>
 
-</div>
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label">Export</label>
+              <div class="panel__row panel__row--wrap">
+                <button id="exportBtn" class="panel__btn panel__btn--primary" type="button">PNG</button>
+                <button id="exportSvgBtn" class="panel__btn panel__btn--primary" type="button">SVG</button>
+                <button id="printBtn" class="panel__btn panel__btn--primary" type="button">Print</button>
+              </div>
+            </div>
 
-<div class="hint">
-Wheel zooms • Space + drag pans • Ctrl/Cmd bypasses snapping •
-Ctrl/Cmd + Z undo • Ctrl/Cmd + Y redo
-</div>
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label">Line options</label>
+              <div class="linePresetGrid">
+                <div class="linePresetCard">
+                  <div class="linePresetCard__top">
+                    <span class="linePresetCard__title">Reference</span>
+                    <span class="lineIcon lineIcon--reference" aria-hidden="true"></span>
+                  </div>
+                  <div class="panel__row panel__row--wrap">
+                    <input id="refColorInput" class="panel__input panel__input--color" type="color" value="#1b5e20" />
+                    <input id="refSizeInput" class="panel__input panel__input--number" type="number" min="1" max="60" step="1" value="10" />
+                    <span class="panel__note">px</span>
+                  </div>
+                </div>
+                <div class="linePresetCard">
+                  <div class="linePresetCard__top">
+                    <span class="linePresetCard__title">Hidden</span>
+                    <span class="lineIcon lineIcon--hidden" aria-hidden="true"></span>
+                  </div>
+                  <div class="panel__row panel__row--wrap">
+                    <input id="hiddenColorInput" class="panel__input panel__input--color" type="color" value="#1976d2" />
+                    <input id="hiddenSizeInput" class="panel__input panel__input--number" type="number" min="1" max="60" step="1" value="10" />
+                    <span class="panel__note">px</span>
+                  </div>
+                </div>
+                <div class="linePresetCard">
+                  <div class="linePresetCard__top">
+                    <span class="linePresetCard__title">Center</span>
+                    <span class="lineIcon lineIcon--center" aria-hidden="true"></span>
+                  </div>
+                  <div class="panel__row panel__row--wrap">
+                    <input id="centerColorInput" class="panel__input panel__input--color" type="color" value="#d32f2f" />
+                    <input id="centerSizeInput" class="panel__input panel__input--number" type="number" min="1" max="60" step="1" value="10" />
+                    <span class="panel__note">px</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel__note">These settings drive the quick Reference, Hidden, and Center preset buttons.</div>
+            </div>
 
-</section>
+            <div class="panel__group panel__group--wide">
+              <label class="panel__label">Scale</label>
+              <div class="panel__row panel__row--wrap">
+                <span id="scaleOut" class="panel__note">1 mm = 3.780 px</span>
+                <button id="resetScaleBtn" class="panel__btn" type="button">Reset</button>
+              </div>
+              <div class="panel__note">Use the 📏 button on the left to set scale from a selected line.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-</main>
+      <div class="hint">
+        Wheel zooms • Space + drag pans • Ctrl/Cmd bypasses snapping • Right-click: finish PolyFill / reset Arc • Ctrl/Cmd + Z undo • Ctrl/Cmd + Y redo • Delete removes selected
+      </div>
+    </section>
+  </main>
 
-<script src="whiteboard.shared.js"></script>
-<script src="whiteboard.geometry.js"></script>
-<script src="whiteboard.render.js"></script>
-<script src="whiteboard.io.js"></script>
-<script src="whiteboard.ui.js"></script>
-<script src="whiteboard.js"></script>
+  <script src="whiteboard.shared.js"></script>
+  <script src="whiteboard.geometry.js"></script>
+  <script src="whiteboard.render.js"></script>
+  <script src="whiteboard.io.js"></script>
+  <script src="whiteboard.ui.js"></script>
+  <script src="whiteboard.js"></script>
 
-<script>
+  <script>
+    const pagesBtn = document.getElementById('pagesBtn');
+    const pagesPop = document.getElementById('pagesPop');
 
-/* PAGE MENU */
+    function closePages(){
+      pagesPop.classList.add('is-hidden');
+      pagesBtn.setAttribute('aria-expanded', 'false');
+    }
 
-const pagesBtn = document.getElementById("pagesBtn")
-const pagesPop = document.getElementById("pagesPop")
+    pagesBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const isHidden = pagesPop.classList.contains('is-hidden');
+      if (isHidden) {
+        pagesPop.classList.remove('is-hidden');
+        pagesBtn.setAttribute('aria-expanded', 'true');
+      } else {
+        closePages();
+      }
+    });
 
-function closePages(){
-pagesPop.classList.add("is-hidden")
-}
+    pagesPop.addEventListener('click', e => {
+      e.stopPropagation();
+    });
 
-pagesBtn.addEventListener("click",e=>{
-e.stopPropagation()
+    document.addEventListener('click', closePages);
 
-pagesPop.classList.toggle("is-hidden")
-})
-
-pagesPop.addEventListener("click",e=>{
-e.stopPropagation()
-})
-
-document.addEventListener("click",closePages)
-
-document.addEventListener("keydown",e=>{
-if(e.key==="Escape") closePages()
-})
-
-</script>
-
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closePages();
+    });
+  </script>
 </body>
 </html>
