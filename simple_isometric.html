@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Isometric Grid Generator</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --border:#334155;
+      --accent:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,Helvetica,sans-serif;
+      background:linear-gradient(180deg,#0b1220,#111827);
+      color:var(--text);
+      min-height:100vh;
+    }
+    .app{
+      display:grid;
+      grid-template-columns:340px 1fr;
+      min-height:100vh;
+    }
+    .controls{
+      padding:18px;
+      background:rgba(17,24,39,.96);
+      border-right:1px solid var(--border);
+      overflow:auto;
+    }
+    .preview{
+      padding:18px;
+      overflow:auto;
+    }
+    h1{
+      margin:0 0 8px;
+      font-size:1.3rem;
+    }
+    .lead{
+      margin:0 0 16px;
+      color:var(--muted);
+      line-height:1.4;
+      font-size:.95rem;
+    }
+    .card{
+      background:rgba(31,41,55,.72);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:12px;
+    }
+    .card h2{
+      margin:0 0 12px;
+      font-size:1rem;
+    }
+    label{
+      display:block;
+      margin:10px 0 6px;
+      color:#dbeafe;
+      font-size:.92rem;
+    }
+    input[type="number"], select, input[type="color"]{
+      width:100%;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#0b1220;
+      color:var(--text);
+    }
+    input[type="range"]{ width:100%; }
+    input[type="color"]{ height:42px; padding:4px; }
+    .row{
+      display:grid;
+      grid-template-columns:1fr 90px;
+      gap:10px;
+      align-items:center;
+    }
+    .check{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin:8px 0;
+      font-size:.92rem;
+    }
+    .btns{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:8px;
+    }
+    button{
+      border:none;
+      border-radius:12px;
+      padding:11px 14px;
+      cursor:pointer;
+      font-weight:700;
+      background:var(--accent);
+      color:#082f49;
+    }
+    button.secondary{
+      background:#e2e8f0;
+      color:#111827;
+    }
+    .sheet{
+      background:#fff;
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 12px 30px rgba(0,0,0,.22);
+      width:max-content;
+      max-width:100%;
+    }
+    canvas{
+      display:block;
+      background:#fff;
+      max-width:100%;
+      height:auto;
+      border:1px solid #cbd5e1;
+    }
+    .meta{
+      color:var(--muted);
+      font-size:.9rem;
+      margin-bottom:12px;
+    }
+    @media (max-width: 900px){
+      .app{ grid-template-columns:1fr; }
+      .controls{ border-right:none; border-bottom:1px solid var(--border); }
+    }
+    @media print{
+      body{ background:#fff; }
+      .controls,.meta{ display:none!important; }
+      .app{ display:block; }
+      .preview{ padding:0; }
+      .sheet{ box-shadow:none; padding:0; border-radius:0; }
+      canvas{ border:none; width:100%!important; }
+      @page{ margin:10mm; size:auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="controls">
+      <h1>Simple Isometric Grid Generator</h1>
+      <p class="lead">Shared spacing for all three line families. Family C is fixed at 0°. The grid now fills the full page even when rotated.</p>
+
+      <div class="card">
+        <h2>Page size</h2>
+        <label for="preset">Preset</label>
+        <select id="preset">
+          <option value="A4L">A4 Landscape</option>
+          <option value="A4">A4 Portrait</option>
+          <option value="LetterL">US Letter Landscape</option>
+          <option value="Letter">US Letter Portrait</option>
+          <option value="Custom">Custom</option>
+        </select>
+
+        <label for="width">Width (px)</label>
+        <input id="width" type="number" min="50" max="6000" value="1123" />
+
+        <label for="height">Height (px)</label>
+        <input id="height" type="number" min="50" max="6000" value="794" />
+      </div>
+
+      <div class="card">
+        <h2>Grid</h2>
+        <label for="spacing">Spacing for all families (px)</label>
+        <div class="row">
+          <input id="spacing" type="range" min="2" max="140" step="1" value="53" />
+          <input id="spacingNum" type="number" min="2" max="140" step="1" value="53" />
+        </div>
+
+        <label for="lineWidth">Line width</label>
+        <div class="row">
+          <input id="lineWidth" type="range" min="0.2" max="4" step="0.1" value="1.4" />
+          <input id="lineWidthNum" type="number" min="0.2" max="4" step="0.1" value="1.4" />
+        </div>
+
+        <label for="rotation">Whole grid rotation</label>
+        <select id="rotation">
+          <option value="0">0°</option>
+          <option value="90">90°</option>
+          <option value="180">180°</option>
+          <option value="270">270°</option>
+        </select>
+
+        <div class="check"><input id="clipToPage" type="checkbox" checked /> Clip cleanly to page edges</div>
+      </div>
+
+      <div class="card">
+        <h2>Style</h2>
+        <label for="bgColor">Background</label>
+        <input id="bgColor" type="color" value="#ffffff" />
+
+        <label for="lineColor">Line color</label>
+        <input id="lineColor" type="color" value="#475569" />
+      </div>
+
+      <div class="card">
+        <h2>Actions</h2>
+        <div class="btns">
+          <button id="downloadSvg">Download SVG</button>
+          <button id="downloadPng" class="secondary">Download PNG</button>
+          <button id="printBtn" class="secondary">Print</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="preview">
+      <div class="meta" id="meta"></div>
+      <div class="sheet">
+        <canvas id="canvas" width="1123" height="794"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const els = {
+      preset:$('preset'),
+      width:$('width'),
+      height:$('height'),
+      spacing:$('spacing'),
+      spacingNum:$('spacingNum'),
+      lineWidth:$('lineWidth'),
+      lineWidthNum:$('lineWidthNum'),
+      rotation:$('rotation'),
+      clipToPage:$('clipToPage'),
+      bgColor:$('bgColor'),
+      lineColor:$('lineColor'),
+      downloadSvg:$('downloadSvg'),
+      downloadPng:$('downloadPng'),
+      printBtn:$('printBtn'),
+      resetBtn:$('resetBtn'),
+      canvas:$('canvas'),
+      meta:$('meta')
+    };
+
+    const defaults = {
+      preset: 'A4L',
+      width: 1123,
+      height: 794,
+      spacing: 53,
+      lineWidth: 1.4,
+      rotation: '90',
+      clipToPage: true,
+      bgColor: '#ffffff',
+      lineColor: '#475569'
+    };
+
+    function syncPair(a,b){
+      const fn = (src,dst)=>{ dst.value = src.value; draw(); };
+      a.addEventListener('input',()=>fn(a,b));
+      b.addEventListener('input',()=>fn(b,a));
+    }
+    syncPair(els.spacing, els.spacingNum);
+    syncPair(els.lineWidth, els.lineWidthNum);
+
+    ['preset','width','height','rotation','clipToPage','bgColor','lineColor'].forEach(id=>{
+      els[id].addEventListener('input', onPresetChange);
+      els[id].addEventListener('change', onPresetChange);
+    });
+
+    els.downloadSvg.addEventListener('click', downloadSVG);
+    els.downloadPng.addEventListener('click', downloadPNG);
+    els.printBtn.addEventListener('click', ()=>window.print());
+    els.resetBtn.addEventListener('click', resetDefaults);
+
+    function onPresetChange(){
+      const preset = els.preset.value;
+      const presets = {
+        A4:[794,1123],
+        A4L:[1123,794],
+        Letter:[816,1056],
+        LetterL:[1056,816]
+      };
+      if (preset !== 'Custom' && presets[preset]){
+        els.width.value = presets[preset][0];
+        els.height.value = presets[preset][1];
+      }
+      draw();
+    }
+
+    function resetDefaults(){
+      els.preset.value = defaults.preset;
+      els.width.value = defaults.width;
+      els.height.value = defaults.height;
+      els.spacing.value = defaults.spacing;
+      els.spacingNum.value = defaults.spacing;
+      els.lineWidth.value = defaults.lineWidth;
+      els.lineWidthNum.value = defaults.lineWidth;
+      els.rotation.value = defaults.rotation;
+      els.clipToPage.checked = defaults.clipToPage;
+      els.bgColor.value = defaults.bgColor;
+      els.lineColor.value = defaults.lineColor;
+      draw();
+    }
+
+    function getSettings(){
+      return {
+        width: Math.max(50, parseInt(els.width.value || defaults.width, 10)),
+        height: Math.max(50, parseInt(els.height.value || defaults.height, 10)),
+        spacing: Math.max(1, parseFloat(els.spacing.value || defaults.spacing)),
+        lineWidth: Math.max(0.1, parseFloat(els.lineWidth.value || defaults.lineWidth)),
+        rotation: parseFloat(els.rotation.value),
+        clipToPage: els.clipToPage.checked,
+        bgColor: els.bgColor.value,
+        lineColor: els.lineColor.value
+      };
+    }
+
+    function collectFamilyLines(rect, angleDeg, spacing){
+      const angle = angleDeg * Math.PI / 180;
+      const nx = -Math.sin(angle);
+      const ny = Math.cos(angle);
+
+      const corners = [
+        [rect.left, rect.top],
+        [rect.right, rect.top],
+        [rect.right, rect.bottom],
+        [rect.left, rect.bottom]
+      ];
+
+      const ds = corners.map(([x,y]) => x * nx + y * ny);
+      const minD = Math.min(...ds);
+      const maxD = Math.max(...ds);
+
+      const start = Math.floor(minD / spacing) * spacing;
+      const end = Math.ceil(maxD / spacing) * spacing;
+      const lines = [];
+
+      for (let d = start; d <= end + 0.001; d += spacing){
+        const pts = [];
+
+        const addPoint = (x,y) => {
+          if (
+            x >= rect.left - 0.01 && x <= rect.right + 0.01 &&
+            y >= rect.top - 0.01 && y <= rect.bottom + 0.01 &&
+            !pts.some(p => Math.abs(p[0]-x) < 0.05 && Math.abs(p[1]-y) < 0.05)
+          ) {
+            pts.push([x,y]);
+          }
+        };
+
+        if (Math.abs(ny) > 1e-9){
+          addPoint(rect.left, (d - rect.left * nx) / ny);
+          addPoint(rect.right, (d - rect.right * nx) / ny);
+        }
+        if (Math.abs(nx) > 1e-9){
+          addPoint((d - rect.top * ny) / nx, rect.top);
+          addPoint((d - rect.bottom * ny) / nx, rect.bottom);
+        }
+
+        if (pts.length >= 2) lines.push([pts[0], pts[1]]);
+      }
+      return lines;
+    }
+
+    function getOversizedRect(width, height){
+      const cx = width / 2;
+      const cy = height / 2;
+      const diag = Math.ceil(Math.sqrt(width * width + height * height));
+      const half = diag / 2;
+      return {
+        left: cx - half,
+        top: cy - half,
+        right: cx + half,
+        bottom: cy + half
+      };
+    }
+
+    function draw(){
+      const s = getSettings();
+      const canvas = els.canvas;
+      canvas.width = s.width;
+      canvas.height = s.height;
+      const ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0,0,s.width,s.height);
+      ctx.fillStyle = s.bgColor;
+      ctx.fillRect(0,0,s.width,s.height);
+
+      const pageRect = { left: 0, top: 0, right: s.width, bottom: s.height };
+      const drawRect = getOversizedRect(s.width, s.height);
+      const cx = s.width / 2;
+      const cy = s.height / 2;
+
+      if (s.clipToPage){
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, s.width, s.height);
+        ctx.clip();
+      }
+
+      ctx.translate(cx, cy);
+      ctx.rotate(s.rotation * Math.PI / 180);
+      ctx.translate(-cx, -cy);
+
+      const families = [60, -60, 0];
+      ctx.strokeStyle = s.lineColor;
+      ctx.lineWidth = s.lineWidth;
+
+      families.forEach(angle => {
+        const lines = collectFamilyLines(drawRect, angle, s.spacing);
+        lines.forEach(line => {
+          ctx.beginPath();
+          ctx.moveTo(line[0][0], line[0][1]);
+          ctx.lineTo(line[1][0], line[1][1]);
+          ctx.stroke();
+        });
+      });
+
+      if (s.clipToPage) ctx.restore();
+
+      els.meta.textContent = `${s.width}×${s.height}px | spacing ${s.spacing}px | families 60°, -60°, 0° | rotation ${s.rotation}°`;
+    }
+
+    function svgLine(x1,y1,x2,y2,color,width){
+      return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${color}" stroke-width="${width}" />`;
+    }
+
+    function generateSVG(){
+      const s = getSettings();
+      const drawRect = getOversizedRect(s.width, s.height);
+      const cx = s.width / 2;
+      const cy = s.height / 2;
+      const parts = [];
+
+      parts.push(`<?xml version="1.0" encoding="UTF-8" standalone="no"?>`);
+      parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${s.width}" height="${s.height}" viewBox="0 0 ${s.width} ${s.height}">`);
+      parts.push(`<rect width="100%" height="100%" fill="${s.bgColor}"/>`);
+
+      if (s.clipToPage){
+        parts.push(`<defs><clipPath id="clipPage"><rect x="0" y="0" width="${s.width}" height="${s.height}" /></clipPath></defs>`);
+      }
+
+      const clip = s.clipToPage ? ` clip-path="url(#clipPage)"` : '';
+      const transform = ` transform="rotate(${s.rotation},${cx},${cy})"`;
+      parts.push(`<g${clip}${transform}>`);
+
+      [60, -60, 0].forEach(angle => {
+        const lines = collectFamilyLines(drawRect, angle, s.spacing);
+        lines.forEach(line => {
+          parts.push(svgLine(line[0][0], line[0][1], line[1][0], line[1][1], s.lineColor, s.lineWidth));
+        });
+      });
+
+      parts.push(`</g>`);
+      parts.push(`</svg>`);
+      return parts.join('');
+    }
+
+    function downloadBlob(filename, blob){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    }
+
+    function downloadSVG(){
+      const svg = generateSVG();
+      downloadBlob('isometric-grid.svg', new Blob([svg], {type:'image/svg+xml;charset=utf-8'}));
+    }
+
+    function downloadPNG(){
+      els.canvas.toBlob(blob => {
+        if (blob) downloadBlob('isometric-grid.png', blob);
+      }, 'image/png');
+    }
+
+    resetDefaults();
+  </script>
+</body>
+</html>
