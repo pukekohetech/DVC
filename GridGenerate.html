@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grid Generator - Architectural + Isometric</title>
+  <style>
+    :root{
+      --bg:#0f172a;
+      --panel:#111827;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --border:#334155;
+      --accent:#38bdf8;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial,Helvetica,sans-serif;
+      background:linear-gradient(180deg,#0b1220,#111827);
+      color:var(--text);
+      min-height:100vh;
+    }
+    .app{display:grid;grid-template-columns:410px 1fr;min-height:100vh}
+    .controls{
+      padding:18px;background:rgba(17,24,39,.97);
+      border-right:1px solid var(--border);overflow:auto
+    }
+    .preview{padding:18px;overflow:auto}
+    h1{margin:0 0 8px;font-size:1.35rem}
+    .lead{margin:0 0 16px;color:var(--muted);line-height:1.45;font-size:.95rem}
+    .card{
+      background:rgba(31,41,55,.72);border:1px solid var(--border);
+      border-radius:14px;padding:14px;margin-bottom:12px
+    }
+    .card h2{margin:0 0 12px;font-size:1rem}
+    label{display:block;margin:10px 0 6px;color:#dbeafe;font-size:.92rem}
+    input[type="number"], select, input[type="color"]{
+      width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);
+      background:#0b1220;color:var(--text)
+    }
+    input[type="range"]{width:100%}
+    input[type="color"]{height:42px;padding:4px}
+    .row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center}
+    .check{display:flex;gap:10px;align-items:center;margin:8px 0;font-size:.92rem}
+    .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+    button{
+      border:none;border-radius:12px;padding:11px 14px;cursor:pointer;
+      font-weight:700;background:var(--accent);color:#082f49
+    }
+    button.secondary{background:#e2e8f0;color:#111827}
+    .sheet{
+      background:#fff;border-radius:16px;padding:16px;
+      box-shadow:0 12px 30px rgba(0,0,0,.22);width:max-content;max-width:100%
+    }
+    canvas{
+      display:block;background:#fff;max-width:100%;height:auto;border:1px solid #cbd5e1
+    }
+    .meta{color:var(--muted);font-size:.9rem;margin-bottom:12px;line-height:1.4}
+    .hint{color:var(--muted);font-size:.84rem;margin-top:8px;line-height:1.35}
+    .hidden{display:none}
+    @media (max-width: 980px){
+      .app{grid-template-columns:1fr}
+      .controls{border-right:none;border-bottom:1px solid var(--border)}
+    }
+    @media print{
+      body{background:#fff}
+      .controls,.meta{display:none!important}
+      .app{display:block}
+      .preview{padding:0}
+      .sheet{box-shadow:none;padding:0;border-radius:0}
+      canvas{border:none;width:100%!important}
+      @page{margin:10mm;size:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="controls">
+      <h1>Grid Generator</h1>
+      <p class="lead">One file with architectural grids and a clean classic isometric option.</p>
+
+      <div class="card">
+        <h2>Page</h2>
+
+        <label for="preset">Paper preset</label>
+        <select id="preset">
+          <option value="A5">A5 Portrait</option>
+          <option value="A5L">A5 Landscape</option>
+          <option value="A4">A4 Portrait</option>
+          <option value="A4L" selected>A4 Landscape</option>
+          <option value="A3">A3 Portrait</option>
+          <option value="A3L">A3 Landscape</option>
+          <option value="Letter">US Letter Portrait</option>
+          <option value="LetterL">US Letter Landscape</option>
+          <option value="Legal">US Legal Portrait</option>
+          <option value="LegalL">US Legal Landscape</option>
+          <option value="Tabloid">Tabloid Portrait</option>
+          <option value="TabloidL">Tabloid Landscape</option>
+          <option value="Custom">Custom mm</option>
+        </select>
+
+        <label for="widthMm">Width (mm)</label>
+        <input id="widthMm" type="number" min="20" max="2000" step="1" value="297" />
+
+        <label for="heightMm">Height (mm)</label>
+        <input id="heightMm" type="number" min="20" max="2000" step="1" value="210" />
+
+        <label for="marginMm">Page margin (mm)</label>
+        <div class="row">
+          <input id="marginMm" type="range" min="0" max="30" step="1" value="8" />
+          <input id="marginMmNum" type="number" min="0" max="30" step="1" value="8" />
+        </div>
+
+        <label for="ppi">Preview pixels per inch</label>
+        <input id="ppi" type="number" min="72" max="300" step="1" value="96" />
+      </div>
+
+      <div class="card">
+        <h2>Grid mode</h2>
+
+        <label for="gridFamily">Grid family</label>
+        <select id="gridFamily">
+          <option value="architectural">Architectural</option>
+          <option value="isometric" selected>Isometric</option>
+        </select>
+
+        <div id="architecturalControls" class="hidden">
+          <label for="archGridType">Architectural grid type</label>
+          <select id="archGridType">
+            <option value="square" selected>Square grid</option>
+            <option value="dot">Dot grid</option>
+          </select>
+
+          <label for="scalePreset">Scale preset</label>
+          <select id="scalePreset">
+            <option value="custom">Custom module</option>
+            <option value="10">1:10</option>
+            <option value="20">1:20</option>
+            <option value="25">1:25</option>
+            <option value="50" selected>1:50</option>
+            <option value="75">1:75</option>
+            <option value="100">1:100</option>
+            <option value="125">1:125</option>
+            <option value="200">1:200</option>
+            <option value="250">1:250</option>
+          </select>
+
+          <label for="moduleMm">Real-world module size (mm)</label>
+          <select id="moduleMm">
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="400">400</option>
+            <option value="500" selected>500</option>
+            <option value="600">600</option>
+            <option value="900">900</option>
+            <option value="1000">1000</option>
+            <option value="1200">1200</option>
+          </select>
+
+          <label for="archSpacingMm">Grid spacing on page (mm)</label>
+          <div class="row">
+            <input id="archSpacingMm" type="range" min="1" max="30" step="0.5" value="10" />
+            <input id="archSpacingMmNum" type="number" min="1" max="30" step="0.5" value="10" />
+          </div>
+
+          <label for="majorEvery">Major line every N modules</label>
+          <input id="majorEvery" type="number" min="1" max="20" step="1" value="4" />
+
+          <div class="check"><input id="showMinor" type="checkbox" checked /> Show minor grid</div>
+          <div class="check"><input id="showMajor" type="checkbox" checked /> Show major grid</div>
+          <div class="check"><input id="showCoords" type="checkbox" /> Show coordinate labels</div>
+        </div>
+
+        <div id="isometricControls">
+          <label for="isoPreset">Isometric preset</label>
+          <select id="isoPreset">
+            <option value="classic" selected>Classic isometric</option>
+          </select>
+
+          <label for="isoSpacingMm">Spacing for all families (mm)</label>
+          <div class="row">
+            <input id="isoSpacingMm" type="range" min="1" max="30" step="0.5" value="5" />
+            <input id="isoSpacingMmNum" type="number" min="1" max="30" step="0.5" value="5" />
+          </div>
+
+          <label for="isoRotation">Whole grid rotation</label>
+          <select id="isoRotation">
+            <option value="0">0°</option>
+            <option value="90" selected>90°</option>
+            <option value="180">180°</option>
+            <option value="270">270°</option>
+          </select>
+
+          <label for="isoAngleA">Family A angle</label>
+          <input id="isoAngleA" type="number" step="1" value="60" />
+
+          <label for="isoAngleB">Family B angle</label>
+          <input id="isoAngleB" type="number" step="1" value="-60" />
+
+          <label for="isoAngleC">Family C angle</label>
+          <input id="isoAngleC" type="number" step="1" value="0" />
+
+          <div class="check"><input id="isoShowA" type="checkbox" checked /> Show family A</div>
+          <div class="check"><input id="isoShowB" type="checkbox" checked /> Show family B</div>
+          <div class="check"><input id="isoShowC" type="checkbox" checked /> Show family C</div>
+        </div>
+
+        <div class="check"><input id="showBorder" type="checkbox" checked /> Show drawing border</div>
+      </div>
+
+      <div class="card">
+        <h2>Style</h2>
+
+        <label for="minorWidth">Minor line width</label>
+        <div class="row">
+          <input id="minorWidth" type="range" min="0.1" max="3" step="0.1" value="0.5" />
+          <input id="minorWidthNum" type="number" min="0.1" max="3" step="0.1" value="0.5" />
+        </div>
+
+        <label for="majorWidth">Major line width</label>
+        <div class="row">
+          <input id="majorWidth" type="range" min="0.1" max="4" step="0.1" value="1.1" />
+          <input id="majorWidthNum" type="number" min="0.1" max="4" step="0.1" value="1.1" />
+        </div>
+
+        <label for="dotSize">Dot size (dot grid only)</label>
+        <div class="row">
+          <input id="dotSize" type="range" min="0.4" max="4" step="0.1" value="1.2" />
+          <input id="dotSizeNum" type="number" min="0.4" max="4" step="0.1" value="1.2" />
+        </div>
+
+        <label for="bgColor">Background</label>
+        <input id="bgColor" type="color" value="#ffffff" />
+
+        <label for="minorColor">Minor/isometric line color</label>
+        <input id="minorColor" type="color" value="#cbd5e1" />
+
+        <label for="majorColor">Major grid color</label>
+        <input id="majorColor" type="color" value="#64748b" />
+
+        <label for="borderColor">Border/label color</label>
+        <input id="borderColor" type="color" value="#334155" />
+      </div>
+
+      <div class="card">
+        <h2>Actions</h2>
+        <div class="btns">
+          <button id="downloadSvg">Download SVG</button>
+          <button id="downloadPng" class="secondary">Download PNG</button>
+          <button id="printBtn" class="secondary">Print</button>
+          <button id="resetBtn" class="secondary">Reset</button>
+        </div>
+        <div class="hint">SVG stays vector and uses actual mm dimensions.</div>
+      </div>
+    </aside>
+
+    <main class="preview">
+      <div class="meta" id="meta"></div>
+      <div class="sheet">
+        <canvas id="canvas"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const MM_PER_INCH = 25.4;
+    const PAPER_PRESETS = {
+      A5: [148, 210], A5L: [210, 148],
+      A4: [210, 297], A4L: [297, 210],
+      A3: [297, 420], A3L: [420, 297],
+      Letter: [215.9, 279.4], LetterL: [279.4, 215.9],
+      Legal: [215.9, 355.6], LegalL: [355.6, 215.9],
+      Tabloid: [279.4, 431.8], TabloidL: [431.8, 279.4]
+    };
+    const SCALE_PRESETS = {"10":10,"20":20,"25":25,"50":50,"75":75,"100":100,"125":125,"200":200,"250":250};
+
+    const $ = id => document.getElementById(id);
+    const els = {
+      preset:$('preset'), widthMm:$('widthMm'), heightMm:$('heightMm'),
+      marginMm:$('marginMm'), marginMmNum:$('marginMmNum'), ppi:$('ppi'),
+      gridFamily:$('gridFamily'),
+      architecturalControls:$('architecturalControls'),
+      archGridType:$('archGridType'), scalePreset:$('scalePreset'), moduleMm:$('moduleMm'),
+      archSpacingMm:$('archSpacingMm'), archSpacingMmNum:$('archSpacingMmNum'),
+      majorEvery:$('majorEvery'), showMinor:$('showMinor'), showMajor:$('showMajor'), showCoords:$('showCoords'),
+      isometricControls:$('isometricControls'),
+      isoPreset:$('isoPreset'), isoSpacingMm:$('isoSpacingMm'), isoSpacingMmNum:$('isoSpacingMmNum'),
+      isoRotation:$('isoRotation'), isoAngleA:$('isoAngleA'), isoAngleB:$('isoAngleB'), isoAngleC:$('isoAngleC'),
+      isoShowA:$('isoShowA'), isoShowB:$('isoShowB'), isoShowC:$('isoShowC'),
+      showBorder:$('showBorder'),
+      minorWidth:$('minorWidth'), minorWidthNum:$('minorWidthNum'),
+      majorWidth:$('majorWidth'), majorWidthNum:$('majorWidthNum'),
+      dotSize:$('dotSize'), dotSizeNum:$('dotSizeNum'),
+      bgColor:$('bgColor'), minorColor:$('minorColor'), majorColor:$('majorColor'), borderColor:$('borderColor'),
+      downloadSvg:$('downloadSvg'), downloadPng:$('downloadPng'), printBtn:$('printBtn'), resetBtn:$('resetBtn'),
+      canvas:$('canvas'), meta:$('meta')
+    };
+
+    function syncPair(a,b){
+      const fn = (src,dst)=>{ dst.value = src.value; draw(); };
+      a.addEventListener('input',()=>fn(a,b));
+      b.addEventListener('input',()=>fn(b,a));
+    }
+    syncPair(els.marginMm, els.marginMmNum);
+    syncPair(els.archSpacingMm, els.archSpacingMmNum);
+    syncPair(els.isoSpacingMm, els.isoSpacingMmNum);
+    syncPair(els.minorWidth, els.minorWidthNum);
+    syncPair(els.majorWidth, els.majorWidthNum);
+    syncPair(els.dotSize, els.dotSizeNum);
+
+    [
+      'preset','widthMm','heightMm','ppi','gridFamily','archGridType','scalePreset','moduleMm',
+      'majorEvery','showMinor','showMajor','showCoords','isoPreset','isoRotation',
+      'isoAngleA','isoAngleB','isoAngleC','isoShowA','isoShowB','isoShowC','showBorder',
+      'bgColor','minorColor','majorColor','borderColor'
+    ].forEach(id=>{
+      els[id].addEventListener('input', onInputChanged);
+      els[id].addEventListener('change', onInputChanged);
+    });
+
+    els.downloadSvg.addEventListener('click', downloadSVG);
+    els.downloadPng.addEventListener('click', downloadPNG);
+    els.printBtn.addEventListener('click', ()=>window.print());
+    els.resetBtn.addEventListener('click', resetDefaults);
+
+    function mmToPx(mm, ppi){ return mm * ppi / MM_PER_INCH; }
+
+    function applyPresetValue(preset){
+      if (preset !== 'Custom' && PAPER_PRESETS[preset]) {
+        const [w,h] = PAPER_PRESETS[preset];
+        els.widthMm.value = w;
+        els.heightMm.value = h;
+      }
+    }
+
+    function maybeSetPresetFromDimensions(){
+      const w = Number(els.widthMm.value), h = Number(els.heightMm.value);
+      const match = Object.entries(PAPER_PRESETS).find(([,dims]) =>
+        Math.abs(dims[0]-w)<0.2 && Math.abs(dims[1]-h)<0.2
+      );
+      els.preset.value = match ? match[0] : 'Custom';
+    }
+
+    function applyScalePreset(){
+      const key = els.scalePreset.value;
+      if (key === 'custom') return;
+      const pageSpacing = parseFloat(els.moduleMm.value) / SCALE_PRESETS[key];
+      els.archSpacingMm.value = pageSpacing;
+      els.archSpacingMmNum.value = pageSpacing;
+    }
+
+    function applyIsoPreset(){
+      els.isoAngleA.value = 60;
+      els.isoAngleB.value = -60;
+      els.isoAngleC.value = 0;
+      els.isoRotation.value = '90';
+      els.isoSpacingMm.value = 5;
+      els.isoSpacingMmNum.value = 5;
+      els.isoShowA.checked = true;
+      els.isoShowB.checked = true;
+      els.isoShowC.checked = true;
+    }
+
+    function toggleModeUI(){
+      const isArch = els.gridFamily.value === 'architectural';
+      els.architecturalControls.classList.toggle('hidden', !isArch);
+      els.isometricControls.classList.toggle('hidden', isArch);
+    }
+
+    function onInputChanged(e){
+      if (e && e.target === els.preset){
+        applyPresetValue(els.preset.value);
+      } else if (e && (e.target === els.widthMm || e.target === els.heightMm)){
+        maybeSetPresetFromDimensions();
+      } else if (e && (e.target === els.scalePreset || e.target === els.moduleMm)){
+        applyScalePreset();
+      } else if (e && e.target === els.isoPreset){
+        applyIsoPreset();
+      } else if (e && e.target === els.gridFamily){
+        toggleModeUI();
+      }
+      draw();
+    }
+
+    function resetDefaults(){
+      els.preset.value = 'A4L';
+      els.widthMm.value = 297;
+      els.heightMm.value = 210;
+      els.marginMm.value = 8; els.marginMmNum.value = 8;
+      els.ppi.value = 96;
+      els.gridFamily.value = 'isometric';
+
+      els.archGridType.value = 'square';
+      els.scalePreset.value = '50';
+      els.moduleMm.value = '500';
+      els.archSpacingMm.value = 10; els.archSpacingMmNum.value = 10;
+      els.majorEvery.value = 4;
+      els.showMinor.checked = true;
+      els.showMajor.checked = true;
+      els.showCoords.checked = false;
+
+      els.isoPreset.value = 'classic';
+      els.isoSpacingMm.value = 5; els.isoSpacingMmNum.value = 5;
+      els.isoRotation.value = '90';
+      els.isoAngleA.value = 60;
+      els.isoAngleB.value = -60;
+      els.isoAngleC.value = 0;
+      els.isoShowA.checked = true;
+      els.isoShowB.checked = true;
+      els.isoShowC.checked = true;
+
+      els.showBorder.checked = true;
+      els.minorWidth.value = 0.5; els.minorWidthNum.value = 0.5;
+      els.majorWidth.value = 1.1; els.majorWidthNum.value = 1.1;
+      els.dotSize.value = 1.2; els.dotSizeNum.value = 1.2;
+      els.bgColor.value = '#ffffff';
+      els.minorColor.value = '#cbd5e1';
+      els.majorColor.value = '#64748b';
+      els.borderColor.value = '#334155';
+      toggleModeUI();
+      draw();
+    }
+
+    function getSettings(){
+      const widthMm = Math.max(20, parseFloat(els.widthMm.value || 297));
+      const heightMm = Math.max(20, parseFloat(els.heightMm.value || 210));
+      const ppi = Math.max(72, parseInt(els.ppi.value || 96, 10));
+      const marginMm = Math.max(0, parseFloat(els.marginMm.value || 8));
+      return {
+        widthMm, heightMm, ppi,
+        widthPx: Math.max(1, Math.round(mmToPx(widthMm, ppi))),
+        heightPx: Math.max(1, Math.round(mmToPx(heightMm, ppi))),
+        marginMm, marginPx: mmToPx(marginMm, ppi),
+        gridFamily: els.gridFamily.value,
+        archGridType: els.archGridType.value,
+        archSpacingMm: Math.max(0.1, parseFloat(els.archSpacingMm.value || 10)),
+        archSpacingPx: mmToPx(Math.max(0.1, parseFloat(els.archSpacingMm.value || 10)), ppi),
+        majorEvery: Math.max(1, parseInt(els.majorEvery.value || 4, 10)),
+        showMinor: els.showMinor.checked,
+        showMajor: els.showMajor.checked,
+        showCoords: els.showCoords.checked,
+        isoSpacingMm: Math.max(0.1, parseFloat(els.isoSpacingMm.value || 5)),
+        isoSpacingPx: mmToPx(Math.max(0.1, parseFloat(els.isoSpacingMm.value || 5)), ppi),
+        isoRotation: parseFloat(els.isoRotation.value || 0),
+        isoAngles: [
+          parseFloat(els.isoAngleA.value || 0),
+          parseFloat(els.isoAngleB.value || 0),
+          parseFloat(els.isoAngleC.value || 0)
+        ],
+        isoShow: [els.isoShowA.checked, els.isoShowB.checked, els.isoShowC.checked],
+        showBorder: els.showBorder.checked,
+        minorWidth: Math.max(0.1, parseFloat(els.minorWidth.value || 0.5)),
+        majorWidth: Math.max(0.1, parseFloat(els.majorWidth.value || 1.1)),
+        dotSize: Math.max(0.2, parseFloat(els.dotSize.value || 1.2)),
+        bgColor: els.bgColor.value,
+        minorColor: els.minorColor.value,
+        majorColor: els.majorColor.value,
+        borderColor: els.borderColor.value,
+        moduleMm: parseFloat(els.moduleMm.value || 500),
+        scalePreset: els.scalePreset.value
+      };
+    }
+
+    function getDrawRect(width, height, margin){
+      return {
+        left: margin, top: margin, right: width - margin, bottom: height - margin,
+        width: Math.max(0, width - margin * 2), height: Math.max(0, height - margin * 2)
+      };
+    }
+
+    function drawBorder(ctx, rect, color){
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+      ctx.restore();
+    }
+
+    function drawSquareGrid(ctx, rect, s){
+      const cols = Math.floor(rect.width / s.archSpacingPx);
+      const rows = Math.floor(rect.height / s.archSpacingPx);
+
+      if (s.showMinor){
+        ctx.save();
+        ctx.strokeStyle = s.minorColor;
+        ctx.lineWidth = s.minorWidth;
+        for (let i = 0; i <= cols; i++){
+          if (s.showMajor && i % s.majorEvery === 0) continue;
+          const x = rect.left + i * s.archSpacingPx;
+          ctx.beginPath(); ctx.moveTo(x, rect.top); ctx.lineTo(x, rect.bottom); ctx.stroke();
+        }
+        for (let j = 0; j <= rows; j++){
+          if (s.showMajor && j % s.majorEvery === 0) continue;
+          const y = rect.top + j * s.archSpacingPx;
+          ctx.beginPath(); ctx.moveTo(rect.left, y); ctx.lineTo(rect.right, y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      if (s.showMajor){
+        ctx.save();
+        ctx.strokeStyle = s.majorColor;
+        ctx.lineWidth = s.majorWidth;
+        for (let i = 0; i <= cols; i += s.majorEvery){
+          const x = rect.left + i * s.archSpacingPx;
+          ctx.beginPath(); ctx.moveTo(x, rect.top); ctx.lineTo(x, rect.bottom); ctx.stroke();
+        }
+        for (let j = 0; j <= rows; j += s.majorEvery){
+          const y = rect.top + j * s.archSpacingPx;
+          ctx.beginPath(); ctx.moveTo(rect.left, y); ctx.lineTo(rect.right, y); ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawDotGrid(ctx, rect, s){
+      const cols = Math.floor(rect.width / s.archSpacingPx);
+      const rows = Math.floor(rect.height / s.archSpacingPx);
+      ctx.save();
+      for (let j = 0; j <= rows; j++){
+        for (let i = 0; i <= cols; i++){
+          const major = (i % s.majorEvery === 0) && (j % s.majorEvery === 0);
+          if (major && !s.showMajor) continue;
+          if (!major && !s.showMinor) continue;
+          const x = rect.left + i * s.archSpacingPx;
+          const y = rect.top + j * s.archSpacingPx;
+          const r = major ? Math.max(s.dotSize * 1.35, s.dotSize) : s.dotSize;
+          ctx.fillStyle = major ? s.majorColor : s.minorColor;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawCoords(ctx, rect, s){
+      const cols = Math.floor(rect.width / s.archSpacingPx);
+      const rows = Math.floor(rect.height / s.archSpacingPx);
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      ctx.save();
+      ctx.fillStyle = s.borderColor;
+      ctx.font = `${Math.max(10, s.archSpacingPx * 0.35)}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i <= cols; i += s.majorEvery){
+        const x = rect.left + i * s.archSpacingPx;
+        const label = letters[i / s.majorEvery % letters.length] || String(i / s.majorEvery + 1);
+        ctx.fillText(label, x, rect.top - Math.max(10, s.archSpacingPx * 0.6));
+        ctx.fillText(label, x, rect.bottom + Math.max(10, s.archSpacingPx * 0.6));
+      }
+      ctx.textAlign = 'right';
+      for (let j = 0; j <= rows; j += s.majorEvery){
+        const y = rect.top + j * s.archSpacingPx;
+        ctx.fillText(String(j / s.majorEvery + 1), rect.left - Math.max(10, s.archSpacingPx * 0.5), y);
+      }
+      ctx.restore();
+    }
+
+    function collectFamilyLines(rect, angleDeg, spacing){
+      const angle = angleDeg * Math.PI / 180;
+      const nx = -Math.sin(angle), ny = Math.cos(angle);
+      const corners = [[rect.left,rect.top],[rect.right,rect.top],[rect.right,rect.bottom],[rect.left,rect.bottom]];
+      const ds = corners.map(([x,y]) => x * nx + y * ny);
+      const minD = Math.min(...ds), maxD = Math.max(...ds);
+      const start = Math.floor(minD / spacing) * spacing;
+      const end = Math.ceil(maxD / spacing) * spacing;
+      const lines = [];
+
+      for (let d = start; d <= end + 0.001; d += spacing){
+        const pts = [];
+        const addPoint = (x,y) => {
+          if (x >= rect.left - 0.01 && x <= rect.right + 0.01 &&
+              y >= rect.top - 0.01 && y <= rect.bottom + 0.01 &&
+              !pts.some(p => Math.abs(p[0]-x) < 0.05 && Math.abs(p[1]-y) < 0.05)) {
+            pts.push([x,y]);
+          }
+        };
+        if (Math.abs(ny) > 1e-9){
+          addPoint(rect.left, (d - rect.left * nx) / ny);
+          addPoint(rect.right, (d - rect.right * nx) / ny);
+        }
+        if (Math.abs(nx) > 1e-9){
+          addPoint((d - rect.top * ny) / nx, rect.top);
+          addPoint((d - rect.bottom * ny) / nx, rect.bottom);
+        }
+        if (pts.length >= 2) lines.push([pts[0], pts[1]]);
+      }
+      return lines;
+    }
+
+    function getOversizedRect(width, height){
+      const cx = width / 2, cy = height / 2;
+      const diag = Math.ceil(Math.sqrt(width * width + height * height)) + 8;
+      const half = diag / 2;
+      return {left: cx-half, top: cy-half, right: cx+half, bottom: cy+half};
+    }
+
+    function drawIsometric(ctx, rect, s){
+      const drawRect = getOversizedRect(rect.width, rect.height);
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rect.left, rect.top, rect.width, rect.height);
+      ctx.clip();
+
+      ctx.translate(cx, cy);
+      ctx.rotate(s.isoRotation * Math.PI / 180);
+      ctx.translate(-cx, -cy);
+
+      for (let idx = 0; idx < 3; idx++){
+        if (!s.isoShow[idx]) continue;
+        const angle = s.isoAngles[idx];
+        const shifted = {
+          left: drawRect.left + rect.left,
+          top: drawRect.top + rect.top,
+          right: drawRect.right + rect.left,
+          bottom: drawRect.bottom + rect.top
+        };
+        const lines = collectFamilyLines(shifted, angle, s.isoSpacingPx);
+        ctx.strokeStyle = s.minorColor;
+        ctx.lineWidth = s.minorWidth;
+        lines.forEach(line => {
+          ctx.beginPath();
+          ctx.moveTo(line[0][0], line[0][1]);
+          ctx.lineTo(line[1][0], line[1][1]);
+          ctx.stroke();
+        });
+      }
+
+      ctx.restore();
+    }
+
+    function draw(){
+      const s = getSettings();
+      const canvas = els.canvas;
+      canvas.width = s.widthPx;
+      canvas.height = s.heightPx;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,s.widthPx,s.heightPx);
+      ctx.fillStyle = s.bgColor;
+      ctx.fillRect(0,0,s.widthPx,s.heightPx);
+
+      const rect = getDrawRect(s.widthPx, s.heightPx, s.marginPx);
+
+      if (s.gridFamily === 'architectural'){
+        if (s.archGridType === 'square') drawSquareGrid(ctx, rect, s);
+        else drawDotGrid(ctx, rect, s);
+        if (s.showCoords) drawCoords(ctx, rect, s);
+      } else {
+        drawIsometric(ctx, rect, s);
+      }
+
+      if (s.showBorder) drawBorder(ctx, rect, s.borderColor);
+
+      if (s.gridFamily === 'architectural'){
+        const represented = s.scalePreset === 'custom'
+          ? `module ${s.moduleMm} mm`
+          : `${s.moduleMm} mm @ 1:${s.scalePreset}`;
+        els.meta.textContent = `${s.widthMm}×${s.heightMm} mm | ${s.widthPx}×${s.heightPx} px preview | architectural | spacing ${s.archSpacingMm} mm | ${represented}`;
+      } else {
+        els.meta.textContent = `${s.widthMm}×${s.heightMm} mm | ${s.widthPx}×${s.heightPx} px preview | isometric | spacing ${s.isoSpacingMm} mm | angles ${s.isoAngles.filter((_,i)=>s.isoShow[i]).join(', ')}°`;
+      }
+    }
+
+    function svgLine(x1,y1,x2,y2,color,width){
+      return `<line x1="${x1.toFixed(3)}" y1="${y1.toFixed(3)}" x2="${x2.toFixed(3)}" y2="${y2.toFixed(3)}" stroke="${color}" stroke-width="${width}" />`;
+    }
+    function svgRect(x,y,w,h,stroke,fill,width){
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="${stroke}" stroke-width="${width}" />`;
+    }
+    function svgText(x,y,text,color,size,anchor="middle"){
+      return `<text x="${x}" y="${y}" fill="${color}" font-size="${size}" text-anchor="${anchor}" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif">${text}</text>`;
+    }
+
+    function generateSVG(){
+      const s = getSettings();
+      const rect = getDrawRect(s.widthMm, s.heightMm, s.marginMm);
+      const parts = [];
+      parts.push(`<?xml version="1.0" encoding="UTF-8" standalone="no"?>`);
+      parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${s.widthMm}mm" height="${s.heightMm}mm" viewBox="0 0 ${s.widthMm} ${s.heightMm}">`);
+      parts.push(`<rect x="0" y="0" width="${s.widthMm}" height="${s.heightMm}" fill="${s.bgColor}"/>`);
+
+      if (s.gridFamily === 'architectural'){
+        const cols = Math.floor(rect.width / s.archSpacingMm);
+        const rows = Math.floor(rect.height / s.archSpacingMm);
+        if (s.archGridType === 'square'){
+          if (s.showMinor){
+            for (let i=0;i<=cols;i++){
+              if (s.showMajor && i % s.majorEvery === 0) continue;
+              const x = rect.left + i * s.archSpacingMm;
+              parts.push(svgLine(x, rect.top, x, rect.bottom, s.minorColor, s.minorWidth));
+            }
+            for (let j=0;j<=rows;j++){
+              if (s.showMajor && j % s.majorEvery === 0) continue;
+              const y = rect.top + j * s.archSpacingMm;
+              parts.push(svgLine(rect.left, y, rect.right, y, s.minorColor, s.minorWidth));
+            }
+          }
+          if (s.showMajor){
+            for (let i=0;i<=cols;i+=s.majorEvery){
+              const x = rect.left + i * s.archSpacingMm;
+              parts.push(svgLine(x, rect.top, x, rect.bottom, s.majorColor, s.majorWidth));
+            }
+            for (let j=0;j<=rows;j+=s.majorEvery){
+              const y = rect.top + j * s.archSpacingMm;
+              parts.push(svgLine(rect.left, y, rect.right, y, s.majorColor, s.majorWidth));
+            }
+          }
+        } else {
+          for (let j=0;j<=rows;j++){
+            for (let i=0;i<=cols;i++){
+              const major = (i % s.majorEvery === 0) && (j % s.majorEvery === 0);
+              if (major && !s.showMajor) continue;
+              if (!major && !s.showMinor) continue;
+              const x = rect.left + i * s.archSpacingMm;
+              const y = rect.top + j * s.archSpacingMm;
+              const r = major ? Math.max(s.dotSize * 1.35, s.dotSize) : s.dotSize;
+              const color = major ? s.majorColor : s.minorColor;
+              parts.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" />`);
+            }
+          }
+        }
+        if (s.showCoords){
+          const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+          const fontSize = Math.max(2.6, s.archSpacingMm * 0.35);
+          for (let i=0;i<=cols;i+=s.majorEvery){
+            const x = rect.left + i * s.archSpacingMm;
+            const label = letters[i / s.majorEvery % letters.length] || String(i / s.majorEvery + 1);
+            parts.push(svgText(x, rect.top - Math.max(3, s.archSpacingMm * 0.6), label, s.borderColor, fontSize));
+            parts.push(svgText(x, rect.bottom + Math.max(3, s.archSpacingMm * 0.6), label, s.borderColor, fontSize));
+          }
+          for (let j=0;j<=rows;j+=s.majorEvery){
+            const y = rect.top + j * s.archSpacingMm;
+            parts.push(svgText(rect.left - Math.max(3, s.archSpacingMm * 0.5), y, String(j / s.majorEvery + 1), s.borderColor, fontSize, 'end'));
+          }
+        }
+      } else {
+        const drawRect = getOversizedRect(rect.width, rect.height);
+        const clipId = "clipRect";
+        parts.push(`<defs><clipPath id="${clipId}"><rect x="${rect.left}" y="${rect.top}" width="${rect.width}" height="${rect.height}" /></clipPath></defs>`);
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        parts.push(`<g clip-path="url(#${clipId})">`);
+        parts.push(`<g transform="translate(${cx} ${cy}) rotate(${s.isoRotation}) translate(${-cx} ${-cy})">`);
+        for (let idx=0; idx<3; idx++){
+          if (!s.isoShow[idx]) continue;
+          const shifted = {
+            left: drawRect.left + rect.left,
+            top: drawRect.top + rect.top,
+            right: drawRect.right + rect.left,
+            bottom: drawRect.bottom + rect.top
+          };
+          const lines = collectFamilyLines(shifted, s.isoAngles[idx], s.isoSpacingMm);
+          lines.forEach(line => {
+            parts.push(svgLine(line[0][0], line[0][1], line[1][0], line[1][1], s.minorColor, s.minorWidth));
+          });
+        }
+        parts.push(`</g></g>`);
+      }
+
+      if (s.showBorder){
+        parts.push(svgRect(rect.left, rect.top, rect.width, rect.height, s.borderColor, 'none', 0.6));
+      }
+
+      parts.push(`</svg>`);
+      return parts.join('');
+    }
+
+    function downloadBlob(filename, blob){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    }
+    function downloadSVG(){
+      const svg = generateSVG();
+      downloadBlob('grid-generator.svg', new Blob([svg], {type:'image/svg+xml;charset=utf-8'}));
+    }
+    function downloadPNG(){
+      els.canvas.toBlob(blob => {
+        if (blob) downloadBlob('grid-generator.png', blob);
+      }, 'image/png');
+    }
+
+    resetDefaults();
+  </script>
+</body>
+</html>
