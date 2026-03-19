@@ -1,0 +1,2282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isometric Worksheet Generator</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --page-w: 1700px;
+      --line: #111;
+      --soft: #666;
+      --grid: rgba(70, 70, 70, 0.18);
+      --design-w-mm: 400;
+      --design-h-mm: 277;
+      --print-scale: 1;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #e9e9e9;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    .controls {
+      width: min(var(--page-w), calc(100vw - 24px));
+      margin: 0 auto 14px;
+      background: #fff;
+      border: 2px solid var(--line);
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 12px;
+      align-items: center;
+    }
+
+    .controls label {
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controls input,
+    .controls select {
+      width: 88px;
+      padding: 7px 8px;
+      border: 1.2px solid var(--line);
+      font: inherit;
+      background: #fff;
+    }
+
+    .controls .hint {
+      font-size: 12px;
+      color: var(--soft);
+      margin-left: auto;
+      max-width: 620px;
+    }
+
+    #pagesContainer {
+      width: min(var(--page-w), calc(100vw - 24px));
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sheet {
+      width: 100%;
+      aspect-ratio: 420 / 297;
+      min-height: 0;
+      background: #fff;
+      border: 2px solid var(--line);
+      padding: 12px 12px 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.02fr 0.98fr;
+      gap: 12px;
+      align-items: stretch;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .leftCol {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .section {
+      border: 1.6px solid var(--line);
+      padding: 8px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+
+    .sectionTitle {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .orthoWrap {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      background: #fff;
+      padding: 4px 2px 2px;
+    }
+
+    .orthoCanvas {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
+      background: #fff;
+    }
+
+    .studentSection {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .studentDrawWrap {
+      padding: 6px;
+      min-height: 0;
+      display: flex;
+      background: #fff;
+    }
+
+    .studentIsoCanvas {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: block;
+      background: #fff;
+    }
+
+    .infoBox {
+      border: 1.4px solid var(--line);
+      padding: 8px 8px 7px;
+      font-size: 15px;
+      line-height: 1.24;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      min-height: 0;
+      background: #fff;
+    }
+
+    .infoBox h1 {
+      margin: 0 0 5px;
+      font-size: 19px;
+      line-height: 1.08;
+    }
+
+    .infoBox p {
+      margin: 0 0 5px;
+    }
+
+    .metaGrid {
+      display: grid;
+      grid-template-columns: 1.18fr 0.82fr 1fr;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .metaCell,
+    .field {
+      border: 1.2px solid var(--line);
+      padding: 3px 5px;
+      min-height: 22px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .metaCell strong,
+    .field strong {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .infoFields {
+      display: grid;
+      grid-template-columns: 1.1fr 0.8fr 0.7fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .field .line {
+      flex: 1;
+      border-bottom: 1.2px solid var(--line);
+      height: 16px;
+    }
+
+    .printRow {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1.2px solid #111;
+      background: #fff;
+      color: #111;
+      padding: 10px 14px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .answerSheet {
+      padding: 12px 12px 10px;
+    }
+
+    .answerHeader {
+      border: 1.6px solid var(--line);
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+
+    .answerHeader h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+    }
+
+    .answerHeader p {
+      margin: 0 0 4px;
+      font-size: 14px;
+    }
+
+    .answerTable {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .answerTable th,
+    .answerTable td {
+      border: 1.2px solid var(--line);
+      padding: 7px 8px;
+      vertical-align: top;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .answerTable th {
+      background: #f4f4f4;
+      font-size: 13px;
+    }
+
+    .answerThumb {
+      width: 100%;
+      height: 130px;
+      display: block;
+      background: #fff;
+    }
+
+    .answerNote {
+      margin-top: 4px;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    @page {
+      size: A3 landscape;
+      margin: 10mm;
+    }
+
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .metaGrid,
+      .infoFields { grid-template-columns: 1fr; }
+      .controls .hint { width: 100%; margin-left: 0; }
+    }
+
+    @media (max-width: 700px) {
+      .sheet,
+      .controls,
+      #pagesContainer { width: 100%; }
+    }
+
+    @media print {
+      html, body {
+        background: #fff;
+        padding: 0;
+      }
+
+      body {
+        padding: 0;
+      }
+
+      body.print-a3 {
+        --print-scale: 1;
+      }
+
+      body.print-a4 {
+        --print-scale: 0.682;
+      }
+
+      body.print-a3 {
+        --paper-w: 400mm;
+        --paper-h: 277mm;
+      }
+
+      body.print-a4 {
+        --paper-w: 277mm;
+        --paper-h: 190mm;
+      }
+
+      body.print-a3 .controls,
+      body.print-a4 .controls {
+        display: none;
+      }
+
+      #pagesContainer {
+        width: auto;
+        margin: 0;
+        gap: 0;
+      }
+
+      .sheet {
+        width: calc(var(--design-w-mm) * 1mm);
+        min-height: calc(var(--design-h-mm) * 1mm);
+        height: calc(var(--design-h-mm) * 1mm);
+        aspect-ratio: auto;
+        margin: 0;
+        border: 2px solid #111;
+        box-shadow: none;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        break-after: page;
+        page-break-after: always;
+        transform: scale(var(--print-scale));
+        transform-origin: top left;
+      }
+
+      .sheet:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+      .layout {
+        grid-template-columns: 0.93fr 1.07fr !important;
+        gap: 8px;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .leftCol {
+        gap: 7px;
+      }
+
+      .section {
+        padding: 7px;
+      }
+
+      .sectionTitle {
+        margin-bottom: 6px;
+        padding-bottom: 5px;
+      }
+
+      .orthoWrap,
+      .studentDrawWrap {
+        padding: 4px;
+      }
+
+      .infoBox {
+        padding: 7px 7px 6px;
+        font-size: 13px;
+        line-height: 1.18;
+      }
+
+      .infoBox h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+
+      .infoBox p {
+        margin: 0 0 4px;
+      }
+
+      .metaGrid {
+        grid-template-columns: 1.18fr 0.82fr 1fr !important;
+      }
+
+      .infoFields {
+        grid-template-columns: 1.1fr 0.8fr 0.7fr !important;
+      }
+
+      .metaCell,
+      .field {
+        min-height: 20px;
+        padding: 2px 4px;
+        font-size: 9px;
+      }
+
+      .printRow,
+      button {
+        display: none;
+      }
+
+      .answerSheet {
+        padding: 10px;
+      }
+
+      .answerHeader {
+        margin-bottom: 8px;
+      }
+
+      .answerHeader h1 {
+        font-size: 22px;
+      }
+
+      .answerHeader p,
+      .answerTable th,
+      .answerTable td,
+      .answerNote {
+        font-size: 11px;
+      }
+
+      .answerThumb {
+        height: 112px;
+      }
+    }
+  </style>
+</head>
+<body class="print-a3">
+  <div class="controls">
+    <label>
+      Reliever pack pages
+      <input id="packCount" type="number" min="1" max="40" value="6" />
+    </label>
+    <label>
+      Print size
+      <select id="printSize">
+        <option value="a3" selected>A3 landscape</option>
+        <option value="a4">A4 landscape (scaled)</option>
+      </select>
+    </label>
+    <button id="newBtn" type="button">New worksheet</button>
+    <button id="printBtn" type="button">Print worksheet</button>
+    <button id="printPackBtn" type="button">Print reliever pack</button>
+    <div class="hint">A reliever pack prints the requested number of worksheet pages plus one final answer sheet. Choose A3 for full size or A4 for a scaled landscape copy.</div>
+  </div>
+
+  <div id="pagesContainer"></div>
+
+  <script>
+    const W = 4;
+    const D = 6;
+    const H = 4;
+    const TILE_W = 32;
+    const TILE_H = 16;
+    const CUBE_H = 20;
+    const BLOCK_COUNT = 6;
+    const VIEW_COUNT = BLOCK_COUNT * 3;
+    const BLOCK_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const PRESET = {
+      topBias: 0.52,
+      removeAmt: 0.74,
+      clusterAmt: 0.36,
+      slopeAmt: 1.14,
+      terraceAmt: 0.82,
+      notchAmt: 0.84,
+      pillarAmt: 0.58,
+      bridgeAmt: 0.54,
+      biteAmt: 0.74,
+      symmetryBreak: 0.86,
+      trenchAmt: 0.58,
+    };
+
+    function randBetween(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function makeRandomSettings(base = PRESET) {
+      return {
+        topBias: clamp(base.topBias + randBetween(-0.44, 0.38), 0.02, 0.98),
+        removeAmt: clamp(base.removeAmt + randBetween(-0.22, 0.2), 0.46, 0.94),
+        clusterAmt: clamp(base.clusterAmt + randBetween(-0.38, 0.38), 0.04, 0.98),
+        slopeAmt: clamp(base.slopeAmt + randBetween(-0.7, 0.34), 0.15, 1.6),
+        terraceAmt: clamp(base.terraceAmt + randBetween(-0.4, 0.34), 0.2, 1),
+        notchAmt: clamp(base.notchAmt + randBetween(-0.36, 0.32), 0.22, 1),
+        pillarAmt: clamp(base.pillarAmt + randBetween(-0.24, 0.34), 0.05, 1),
+        bridgeAmt: clamp(base.bridgeAmt + randBetween(-0.28, 0.34), 0.04, 1),
+        biteAmt: clamp(base.biteAmt + randBetween(-0.34, 0.3), 0.2, 1),
+        symmetryBreak: clamp(base.symmetryBreak + randBetween(-0.34, 0.24), 0.25, 1),
+        trenchAmt: clamp(base.trenchAmt + randBetween(-0.26, 0.32), 0.08, 1),
+      };
+    }
+
+    const pagesContainer = document.getElementById('pagesContainer');
+    const newBtn = document.getElementById('newBtn');
+    const printBtn = document.getElementById('printBtn');
+    const printPackBtn = document.getElementById('printPackBtn');
+    const packCountInput = document.getElementById('packCount');
+    const printSizeSelect = document.getElementById('printSize');
+
+    const state = {
+      renderedPages: [],
+    };
+
+    function applyPrintMode() {
+      document.body.classList.remove('print-a3', 'print-a4');
+      document.body.classList.add(printSizeSelect.value === 'a4' ? 'print-a4' : 'print-a3');
+    }
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function iso(x, y, z, originX, originY) {
+      return {
+        x: originX + (x - y) * TILE_W,
+        y: originY + (x + y) * TILE_H - z * CUBE_H,
+      };
+    }
+
+    function computeIsoBounds(occupiedData) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      for (const c of occupiedData) {
+        const p = iso(c.x, c.y, c.z, 0, 0);
+        minX = Math.min(minX, p.x - TILE_W - 2);
+        maxX = Math.max(maxX, p.x + TILE_W + 2);
+        minY = Math.min(minY, p.y - 2);
+        maxY = Math.max(maxY, p.y + TILE_H * 2 + CUBE_H + 2);
+      }
+
+      if (!occupiedData.length) {
+        minX = minY = 0;
+        maxX = maxY = 1;
+      }
+
+      return { minX, maxX, minY, maxY };
+    }
+
+    function drawCube(ctx, x, y, z, originX, originY, occupiedSet) {
+      const p = iso(x, y, z, originX, originY);
+      const top = 'rgb(248,248,248)';
+      const left = 'rgb(232,232,232)';
+      const right = 'rgb(214,214,214)';
+      const stroke = 'rgba(20,20,20,0.96)';
+
+      const hasTop = occupiedSet.has(`${x},${y},${z + 1}`);
+      const hasLeftNeighbor = occupiedSet.has(`${x},${y + 1},${z}`);
+      const hasRightNeighbor = occupiedSet.has(`${x + 1},${y},${z}`);
+
+      const topFrontJoin = occupiedSet.has(`${x},${y - 1},${z}`) && !occupiedSet.has(`${x},${y - 1},${z + 1}`);
+      const topRightJoin = occupiedSet.has(`${x + 1},${y},${z}`) && !occupiedSet.has(`${x + 1},${y},${z + 1}`);
+      const topBackJoin = occupiedSet.has(`${x},${y + 1},${z}`) && !occupiedSet.has(`${x},${y + 1},${z + 1}`);
+      const topLeftJoin = occupiedSet.has(`${x - 1},${y},${z}`) && !occupiedSet.has(`${x - 1},${y},${z + 1}`);
+
+      const leftTopJoin = occupiedSet.has(`${x},${y},${z + 1}`) && !occupiedSet.has(`${x},${y + 1},${z + 1}`);
+      const leftBottomJoin = z > 0 && occupiedSet.has(`${x},${y},${z - 1}`) && !occupiedSet.has(`${x},${y + 1},${z - 1}`);
+      const leftPrevJoin = occupiedSet.has(`${x - 1},${y},${z}`) && !occupiedSet.has(`${x - 1},${y + 1},${z}`);
+      const leftNextJoin = occupiedSet.has(`${x + 1},${y},${z}`) && !occupiedSet.has(`${x + 1},${y + 1},${z}`);
+
+      const rightTopJoin = occupiedSet.has(`${x},${y},${z + 1}`) && !occupiedSet.has(`${x + 1},${y},${z + 1}`);
+      const rightBottomJoin = z > 0 && occupiedSet.has(`${x},${y},${z - 1}`) && !occupiedSet.has(`${x + 1},${y},${z - 1}`);
+      const rightPrevJoin = occupiedSet.has(`${x},${y - 1},${z}`) && !occupiedSet.has(`${x + 1},${y - 1},${z}`);
+      const rightNextJoin = occupiedSet.has(`${x},${y + 1},${z}`) && !occupiedSet.has(`${x + 1},${y + 1},${z}`);
+
+      if (!hasTop) {
+        const a = { x: p.x, y: p.y };
+        const b = { x: p.x + TILE_W, y: p.y + TILE_H };
+        const c = { x: p.x, y: p.y + TILE_H * 2 };
+        const d = { x: p.x - TILE_W, y: p.y + TILE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = top;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!topFrontJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!topRightJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!topBackJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!topLeftJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+
+      if (!hasLeftNeighbor) {
+        const a = { x: p.x - TILE_W, y: p.y + TILE_H };
+        const b = { x: p.x, y: p.y + TILE_H * 2 };
+        const c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H };
+        const d = { x: p.x - TILE_W, y: p.y + TILE_H + CUBE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = left;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!leftTopJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!leftNextJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!leftBottomJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!leftPrevJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+
+      if (!hasRightNeighbor) {
+        const a = { x: p.x + TILE_W, y: p.y + TILE_H };
+        const b = { x: p.x, y: p.y + TILE_H * 2 };
+        const c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H };
+        const d = { x: p.x + TILE_W, y: p.y + TILE_H + CUBE_H };
+
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(c.x, c.y);
+        ctx.lineTo(d.x, d.y);
+        ctx.closePath();
+        ctx.fillStyle = right;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.4;
+        if (!rightTopJoin) { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+        if (!rightNextJoin) { ctx.moveTo(b.x, b.y); ctx.lineTo(c.x, c.y); }
+        if (!rightBottomJoin) { ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); }
+        if (!rightPrevJoin) { ctx.moveTo(d.x, d.y); ctx.lineTo(a.x, a.y); }
+        ctx.stroke();
+      }
+    }
+
+    function renderIsoCanvas(canvas, occupiedData) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const bounds = computeIsoBounds(occupiedData);
+      const availableW = rect.width - 22;
+      const availableH = rect.height - 22;
+      const shapeW = bounds.maxX - bounds.minX;
+      const shapeH = bounds.maxY - bounds.minY;
+      const scale = Math.min(availableW / shapeW, availableH / shapeH, 1.56);
+
+      ctx.save();
+      ctx.translate(rect.width / 2, rect.height / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-(bounds.minX + shapeW / 2), -(bounds.minY + shapeH / 2));
+
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+      const sorted = [...occupiedData].sort((a, b) => {
+        const da = a.x + a.y + a.z * 0.01;
+        const db = b.x + b.y + b.z * 0.01;
+        return da - db || a.z - b.z;
+      });
+
+      for (const cube of sorted) {
+        drawCube(ctx, cube.x, cube.y, cube.z, 0, 0, occupiedSet);
+      }
+
+      ctx.restore();
+    }
+
+    function buildAssembly(settings) {
+      const grid = Array.from({ length: H }, () =>
+        Array.from({ length: D }, () => Array.from({ length: W }, () => true))
+      );
+
+      function inBounds(x, y, z) {
+        return x >= 0 && x < W && y >= 0 && y < D && z >= 0 && z < H;
+      }
+
+      function isOccupied(x, y, z) {
+        return inBounds(x, y, z) && grid[z][y][x];
+      }
+
+      function setOccupied(x, y, z, value) {
+        if (!inBounds(x, y, z)) return;
+        grid[z][y][x] = value;
+      }
+
+      function neighborCoords(x, y, z) {
+        return [
+          [x - 1, y, z], [x + 1, y, z],
+          [x, y - 1, z], [x, y + 1, z],
+          [x, y, z - 1], [x, y, z + 1],
+        ];
+      }
+
+      function countNeighbors(x, y, z) {
+        return neighborCoords(x, y, z).filter(([nx, ny, nz]) => isOccupied(nx, ny, nz)).length;
+      }
+
+      function occupiedCount() {
+        let count = 0;
+        for (let z = 0; z < H; z++) {
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              if (grid[z][y][x]) count += 1;
+            }
+          }
+        }
+        return count;
+      }
+
+      function firstOccupied() {
+        for (let z0 = 0; z0 < H; z0++) {
+          for (let y0 = 0; y0 < D; y0++) {
+            for (let x0 = 0; x0 < W; x0++) {
+              if (grid[z0][y0][x0]) return [x0, y0, z0];
+            }
+          }
+        }
+        return null;
+      }
+
+      function allOccupiedCoords() {
+        const result = [];
+        for (let z = 0; z < H; z++) {
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              if (grid[z][y][x]) result.push({ x, y, z });
+            }
+          }
+        }
+        return result;
+      }
+
+      function hasSpanAcrossX() {
+        const left = new Set();
+        const right = new Set();
+        for (let z = 0; z < H; z++) {
+          for (let y = 0; y < D; y++) {
+            if (grid[z][y][0]) left.add(`${y},${z}`);
+            if (grid[z][y][W - 1]) right.add(`${y},${z}`);
+          }
+        }
+        return left.size > 0 && right.size > 0;
+      }
+
+      function hasSpanAcrossY() {
+        const front = new Set();
+        const back = new Set();
+        for (let z = 0; z < H; z++) {
+          for (let x = 0; x < W; x++) {
+            if (grid[z][0][x]) front.add(`${x},${z}`);
+            if (grid[z][D - 1][x]) back.add(`${x},${z}`);
+          }
+        }
+        return front.size > 0 && back.size > 0;
+      }
+
+      function canRemove(x, y, z) {
+        if (!isOccupied(x, y, z)) return false;
+        grid[z][y][x] = false;
+        let valid = true;
+
+        const start = firstOccupied();
+        if (!start) {
+          grid[z][y][x] = true;
+          return false;
+        }
+
+        const seen = new Set();
+        const q = [start];
+        seen.add(start.join(','));
+
+        while (q.length) {
+          const [cx, cy, cz] = q.shift();
+          for (const [nx, ny, nz] of neighborCoords(cx, cy, cz)) {
+            const key = `${nx},${ny},${nz}`;
+            if (!isOccupied(nx, ny, nz) || seen.has(key)) continue;
+            seen.add(key);
+            q.push([nx, ny, nz]);
+          }
+        }
+
+        for (let zz = 0; zz < H && valid; zz++) {
+          for (let yy = 0; yy < D && valid; yy++) {
+            for (let xx = 0; xx < W && valid; xx++) {
+              if (!grid[zz][yy][xx]) continue;
+              const supported = zz === 0 || grid[zz - 1][yy][xx];
+              const attachedCount = countNeighbors(xx, yy, zz);
+              const connected = seen.has(`${xx},${yy},${zz}`);
+              if (!supported) valid = false;
+              if (attachedCount <= 1) valid = false;
+              if (!connected) valid = false;
+            }
+          }
+        }
+
+        grid[z][y][x] = true;
+        return valid;
+      }
+
+      function isEdgeCell(x, y, z) {
+        return x === 0 || x === W - 1 || y === 0 || y === D - 1 || z === 0 || z === H - 1;
+      }
+
+      function carvedSetForLayer(z) {
+        const set = new Set();
+        for (let y = 0; y < D; y++) {
+          for (let x = 0; x < W; x++) {
+            if (!grid[z][y][x]) set.add(`${x},${y}`);
+          }
+        }
+        return set;
+      }
+
+      function nearestEdgeDirection(x, y) {
+        const distances = [
+          { dir: [-1, 0], dist: x },
+          { dir: [1, 0], dist: W - 1 - x },
+          { dir: [0, -1], dist: y },
+          { dir: [0, 1], dist: D - 1 - y },
+        ].sort((a, b) => a.dist - b.dist);
+        return distances[0].dir;
+      }
+
+      function carveSlopePath(seedX, seedY, z) {
+        const path = [];
+        let x = seedX;
+        let y = seedY;
+        let guard = 0;
+        let momentum = nearestEdgeDirection(x, y);
+
+        while (!isEdgeCell(x, y, z) && guard < 100) {
+          guard++;
+          const preferred = nearestEdgeDirection(x, y);
+          if (Math.random() < settings.slopeAmt) momentum = preferred;
+
+          const side = momentum[0] !== 0
+            ? [momentum[0], Math.random() < 0.5 ? -1 : 1]
+            : [Math.random() < 0.5 ? -1 : 1, momentum[1]];
+
+          const zig = [
+            clamp(momentum[0] + (Math.random() < 0.5 ? -1 : 1), -1, 1),
+            clamp(momentum[1] + (Math.random() < 0.5 ? -1 : 1), -1, 1)
+          ];
+
+          const candidates = [momentum, preferred, side, zig, preferred];
+          let moved = false;
+
+          for (const [dx, dy] of candidates) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (!inBounds(nx, ny, z)) continue;
+            if (grid[z][ny][nx] && canRemove(nx, ny, z)) {
+              path.push({ x: nx, y: ny });
+              x = nx;
+              y = ny;
+              moved = true;
+              break;
+            }
+            if (!grid[z][ny][nx]) {
+              x = nx;
+              y = ny;
+              moved = true;
+              break;
+            }
+          }
+          if (!moved) break;
+        }
+
+        return path;
+      }
+
+      function growCluster(z, targetRemovals) {
+        const sx = Math.floor(Math.random() * W);
+        const sy = Math.floor(Math.random() * D);
+        const frontier = [{ x: sx, y: sy, w: 2 + Math.random() * 2 }];
+        const seen = new Set([`${sx},${sy}`]);
+        let removed = 0;
+
+        while (frontier.length && removed < targetRemovals) {
+          frontier.sort((a, b) => b.w - a.w);
+          const pickIndex = Math.floor(
+            Math.random() * Math.min(frontier.length, Math.max(1, Math.round(5 - settings.clusterAmt * 4)))
+          );
+          const current = frontier.splice(pickIndex, 1)[0];
+
+          if (grid[z][current.y][current.x] && canRemove(current.x, current.y, z)) {
+            grid[z][current.y][current.x] = false;
+            removed++;
+          }
+
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+          for (const [dx, dy] of dirs) {
+            const nx = current.x + dx;
+            const ny = current.y + dy;
+            const key = `${nx},${ny}`;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            let weight = 1 + Math.random() * settings.symmetryBreak;
+            for (const [adx, ady] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const ax = nx + adx;
+              const ay = ny + ady;
+              if (ax >= 0 && ax < W && ay >= 0 && ay < D && !grid[z][ay][ax]) weight += 1.5;
+            }
+            if (nx === 0 || nx === W - 1 || ny === 0 || ny === D - 1) weight *= 2;
+            weight += ((nx + ny + z) % 2 === 0 ? settings.biteAmt : settings.trenchAmt * 0.5);
+            frontier.push({ x: nx, y: ny, w: weight });
+          }
+        }
+      }
+
+      function connectMissingToEdge(z) {
+        const missing = carvedSetForLayer(z);
+        if (!missing.size) return;
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        const seen = new Set();
+        const components = [];
+
+        for (const key of missing) {
+          if (seen.has(key)) continue;
+          const [sx, sy] = key.split(',').map(Number);
+          const comp = [];
+          const q = [{ x: sx, y: sy }];
+          seen.add(key);
+
+          while (q.length) {
+            const cur = q.shift();
+            comp.push(cur);
+            for (const [dx, dy] of dirs) {
+              const nx = cur.x + dx;
+              const ny = cur.y + dy;
+              const nk = `${nx},${ny}`;
+              if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+              if (!missing.has(nk) || seen.has(nk)) continue;
+              seen.add(nk);
+              q.push({ x: nx, y: ny });
+            }
+          }
+          components.push(comp);
+        }
+
+        for (const comp of components) {
+          if (comp.some(c => isEdgeCell(c.x, c.y, z))) continue;
+          const start = comp[Math.floor(Math.random() * comp.length)];
+          const path = carveSlopePath(start.x, start.y, z);
+          for (const step of path) {
+            if (grid[z][step.y][step.x] && canRemove(step.x, step.y, z)) {
+              grid[z][step.y][step.x] = false;
+            }
+          }
+        }
+      }
+
+      function encourageSlopes() {
+        for (let z = H - 1; z >= 1; z--) {
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              if (!grid[z][y][x]) {
+                const options = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+                for (const [dx, dy] of options) {
+                  const nx = x + dx;
+                  const ny = y + dy;
+                  if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+                  if (grid[z - 1][ny][nx] && Math.random() < settings.slopeAmt && canRemove(nx, ny, z - 1)) {
+                    grid[z - 1][ny][nx] = false;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (let z = 0; z < H; z++) {
+        const topFactor = H === 1 ? 1 : z / (H - 1);
+        const removalShare = (1 - settings.topBias) + settings.topBias * topFactor;
+        const targetRemovals = Math.max(
+          2,
+          Math.min(W * D - 2, Math.round(W * D * settings.removeAmt * (0.34 + removalShare)))
+        );
+        growCluster(z, targetRemovals);
+        connectMissingToEdge(z);
+        if (Math.random() < settings.biteAmt) {
+          const sx = Math.floor(Math.random() * W);
+          const sy = Math.floor(Math.random() * D);
+          const path = carveSlopePath(sx, sy, z);
+          for (const step of path) {
+            if (grid[z][step.y][step.x] && canRemove(step.x, step.y, z)) {
+              grid[z][step.y][step.x] = false;
+            }
+          }
+        }
+      }
+
+      function carveTerraces() {
+        const passes = 2 + Math.floor(settings.terraceAmt * 4);
+        for (let pass = 0; pass < passes; pass++) {
+          for (let z = H - 1; z >= 1; z--) {
+            const yFirst = Math.random() < 0.5;
+            const yDir = Math.random() < 0.5 ? 1 : -1;
+            const xDir = Math.random() < 0.5 ? 1 : -1;
+            const ys = Array.from({ length: D }, (_, i) => yDir > 0 ? i : D - 1 - i);
+            const xs = Array.from({ length: W }, (_, i) => xDir > 0 ? i : W - 1 - i);
+            const outer = yFirst ? ys : xs;
+            const inner = yFirst ? xs : ys;
+
+            for (const a of outer) {
+              let terraceStarted = false;
+              for (const b of inner) {
+                const x = yFirst ? b : a;
+                const y = yFirst ? a : b;
+                if (!grid[z][y][x]) continue;
+                const exposedSides = (
+                  (!isOccupied(x + 1, y, z) ? 1 : 0) +
+                  (!isOccupied(x - 1, y, z) ? 1 : 0) +
+                  (!isOccupied(x, y + 1, z) ? 1 : 0) +
+                  (!isOccupied(x, y - 1, z) ? 1 : 0)
+                );
+                const shouldCarve = exposedSides >= 1 && Math.random() < settings.terraceAmt;
+                if (!terraceStarted && shouldCarve && canRemove(x, y, z)) {
+                  grid[z][y][x] = false;
+                  terraceStarted = true;
+                  continue;
+                }
+                if (terraceStarted && Math.random() < settings.terraceAmt * 0.82 && canRemove(x, y, z)) {
+                  grid[z][y][x] = false;
+                } else if (terraceStarted && Math.random() < 0.3) {
+                  terraceStarted = false;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function carveCornerNotches() {
+        const corners = [
+          { x: 0, y: 0 },
+          { x: W - 1, y: 0 },
+          { x: 0, y: D - 1 },
+          { x: W - 1, y: D - 1 },
+        ].sort(() => Math.random() - 0.5);
+
+        for (const corner of corners) {
+          if (Math.random() > settings.notchAmt) continue;
+          const depthSteps = 1 + Math.floor(Math.random() * Math.max(1, Math.round(settings.notchAmt * 4)));
+          const heightStart = 1 + Math.floor(Math.random() * Math.max(1, H - 1));
+          const dx = corner.x === 0 ? 1 : -1;
+          const dy = corner.y === 0 ? 1 : -1;
+
+          for (let step = 0; step < depthSteps; step++) {
+            const cells = [
+              { x: corner.x + dx * step, y: corner.y },
+              { x: corner.x, y: corner.y + dy * step },
+              { x: corner.x + dx * step, y: corner.y + dy * step },
+            ];
+            for (const cell of cells) {
+              if (!inBounds(cell.x, cell.y, 0)) continue;
+              for (let z = H - 1; z >= heightStart; z--) {
+                if (grid[z][cell.y][cell.x] && canRemove(cell.x, cell.y, z)) {
+                  grid[z][cell.y][cell.x] = false;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function carveFaceBites() {
+        const bitePasses = 2 + Math.floor(settings.biteAmt * 6);
+        for (let pass = 0; pass < bitePasses; pass++) {
+          const face = Math.floor(Math.random() * 4);
+          const startZ = Math.floor(Math.random() * H);
+          const runLen = 1 + Math.floor(Math.random() * Math.max(2, Math.round((face % 2 === 0 ? D : W) * 0.95)));
+          const depth = 1 + Math.floor(Math.random() * Math.max(1, Math.round(1 + settings.biteAmt * 2)));
+          const offset = Math.floor(Math.random() * (face % 2 === 0 ? D : W));
+
+          for (let step = 0; step < runLen; step++) {
+            const run = offset + step;
+            for (let dStep = 0; dStep < depth; dStep++) {
+              let x = 0;
+              let y = 0;
+              if (face === 0) {
+                x = dStep;
+                y = run % D;
+              } else if (face === 1) {
+                x = run % W;
+                y = dStep;
+              } else if (face === 2) {
+                x = W - 1 - dStep;
+                y = run % D;
+              } else {
+                x = run % W;
+                y = D - 1 - dStep;
+              }
+              if (!inBounds(x, y, startZ)) continue;
+              for (let z = H - 1; z >= startZ; z--) {
+                if (grid[z][y][x] && Math.random() < 0.88 && canRemove(x, y, z)) {
+                  grid[z][y][x] = false;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function carveRidgeTrenches() {
+        const passes = 1 + Math.floor(settings.trenchAmt * 5);
+        for (let pass = 0; pass < passes; pass++) {
+          const alongX = Math.random() < 0.5;
+          const fixed = alongX ? Math.floor(Math.random() * D) : Math.floor(Math.random() * W);
+          const zStart = 1 + Math.floor(Math.random() * Math.max(1, H - 1));
+          const shiftChance = 0.45 + settings.symmetryBreak * 0.35;
+          let walker = alongX ? Math.floor(Math.random() * W) : Math.floor(Math.random() * D);
+          const steps = alongX ? W + 1 : D + 1;
+
+          for (let i = 0; i < steps; i++) {
+            const x = alongX ? walker : fixed;
+            const y = alongX ? fixed : walker;
+            if (inBounds(x, y, zStart)) {
+              for (let z = H - 1; z >= zStart; z--) {
+                if (grid[z][y][x] && Math.random() < 0.8 && canRemove(x, y, z)) {
+                  grid[z][y][x] = false;
+                }
+              }
+            }
+            walker += Math.random() < shiftChance ? (Math.random() < 0.5 ? -1 : 1) : 1;
+            walker = clamp(walker, 0, (alongX ? W : D) - 1);
+          }
+        }
+      }
+
+      function addPillarsAndBridges() {
+        const candidates = [];
+        for (let y = 0; y < D; y++) {
+          for (let x = 0; x < W; x++) {
+            let top = -1;
+            for (let z = H - 1; z >= 0; z--) {
+              if (grid[z][y][x]) {
+                top = z;
+                break;
+              }
+            }
+            if (top < 0 || top >= H - 1) continue;
+            const edgeish = x === 0 || x === W - 1 || y === 0 || y === D - 1;
+            const exposedSides = (
+              (!isOccupied(x + 1, y, top) ? 1 : 0) +
+              (!isOccupied(x - 1, y, top) ? 1 : 0) +
+              (!isOccupied(x, y + 1, top) ? 1 : 0) +
+              (!isOccupied(x, y - 1, top) ? 1 : 0)
+            );
+            if (edgeish || exposedSides >= 1) candidates.push({ x, y, z: top });
+          }
+        }
+
+        const shuffled = shuffle(candidates);
+        const addCount = Math.min(shuffled.length, Math.floor(2 + settings.pillarAmt * 5));
+        for (let i = 0; i < addCount; i++) {
+          if (Math.random() > settings.pillarAmt) continue;
+          const cell = shuffled[i];
+          if (cell.z + 1 < H) setOccupied(cell.x, cell.y, cell.z + 1, true);
+        }
+
+        const bridgeAttempts = 1 + Math.floor(settings.bridgeAmt * 3);
+        for (let attempt = 0; attempt < bridgeAttempts; attempt++) {
+          if (Math.random() > settings.bridgeAmt) continue;
+          const topCells = [];
+          for (let y = 0; y < D; y++) {
+            for (let x = 0; x < W; x++) {
+              for (let z = H - 1; z >= 1; z--) {
+                if (grid[z][y][x]) {
+                  topCells.push({ x, y, z });
+                  break;
+                }
+              }
+            }
+          }
+          const ordered = shuffle(topCells);
+          for (const cell of ordered) {
+            const dirs = shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+            let bridged = false;
+            for (const [dx, dy] of dirs) {
+              const mx = cell.x + dx;
+              const my = cell.y + dy;
+              const tx = cell.x + dx * 2;
+              const ty = cell.y + dy * 2;
+              if (!inBounds(mx, my, cell.z) || !inBounds(tx, ty, cell.z)) continue;
+              if (grid[cell.z][my][mx]) continue;
+              if (grid[cell.z][ty][tx] && grid[cell.z - 1][my][mx]) {
+                setOccupied(mx, my, cell.z, true);
+                bridged = true;
+                break;
+              }
+            }
+            if (bridged) break;
+          }
+        }
+      }
+
+      function cleanupThinSpots() {
+        for (let pass = 0; pass < 4; pass++) {
+          for (let z = H - 1; z >= 0; z--) {
+            for (let y = 0; y < D; y++) {
+              for (let x = 0; x < W; x++) {
+                if (grid[z][y][x] && countNeighbors(x, y, z) <= 1 && canRemove(x, y, z)) {
+                  grid[z][y][x] = false;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function ensureInterestingMass() {
+        const count = occupiedCount();
+        if (count < 12) {
+          const refill = shuffle(allOccupiedCoords()).slice(0, 5);
+          for (const cube of refill) {
+            if (cube.z + 1 < H) setOccupied(cube.x, cube.y, cube.z + 1, true);
+          }
+        }
+        if (!hasSpanAcrossX() && !hasSpanAcrossY()) {
+          const y = Math.floor(Math.random() * D);
+          for (let x = 0; x < W; x++) setOccupied(x, y, 0, true);
+        }
+      }
+
+      carveTerraces();
+      carveCornerNotches();
+      carveFaceBites();
+      carveRidgeTrenches();
+      encourageSlopes();
+      addPillarsAndBridges();
+      cleanupThinSpots();
+      ensureInterestingMass();
+
+      const occupied = [];
+      for (let z = 0; z < H; z++) {
+        for (let y = 0; y < D; y++) {
+          for (let x = 0; x < W; x++) {
+            if (grid[z][y][x]) occupied.push({ x, y, z });
+          }
+        }
+      }
+
+      return occupied;
+    }
+
+    function simplifyShape(occupiedData) {
+      const heights = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (const c of occupiedData) {
+        if (c.z > heights[c.y][c.x]) heights[c.y][c.x] = c.z;
+      }
+
+      const simple = [];
+      for (let y = 0; y < D; y++) {
+        for (let x = 0; x < W; x++) {
+          const h = heights[y][x];
+          if (h < 0) continue;
+          for (let z = 0; z <= h; z++) {
+            simple.push({ x, y, z });
+          }
+        }
+      }
+      return simple;
+    }
+
+    function buildMaps(occupiedData) {
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+
+      const topMap = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (let y = 0; y < D; y++) {
+        for (let x = 0; x < W; x++) {
+          for (let z = H - 1; z >= 0; z--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              topMap[y][x] = z;
+              break;
+            }
+          }
+        }
+      }
+
+      const frontMap = Array.from({ length: H }, () => Array(D).fill(null));
+      for (let z = 0; z < H; z++) {
+        for (let y = 0; y < D; y++) {
+          for (let x = W - 1; x >= 0; x--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              frontMap[z][y] = x;
+              break;
+            }
+          }
+        }
+      }
+
+      const leftMap = Array.from({ length: H }, () => Array(W).fill(null));
+      for (let z = 0; z < H; z++) {
+        for (let x = 0; x < W; x++) {
+          for (let y = D - 1; y >= 0; y--) {
+            if (occupiedSet.has(`${x},${y},${z}`)) {
+              leftMap[z][x] = y;
+              break;
+            }
+          }
+        }
+      }
+
+      return { topMap, frontMap, leftMap, occupiedSet };
+    }
+
+    function transformProjectionMap(sourceMap, mode) {
+      const rotateMapCW = map => {
+        const oldRows = map.length;
+        const oldCols = map[0].length;
+        return Array.from({ length: oldCols }, (_, r) =>
+          Array.from({ length: oldRows }, (_, c) => map[oldRows - 1 - c][r])
+        );
+      };
+
+      return mode === 'front'
+        ? sourceMap.map(row => [...row].reverse())
+        : mode === 'top'
+          ? rotateMapCW(sourceMap)
+          : sourceMap;
+    }
+
+    function drawMapProjection(canvasEl, map, mode, sharedCell = null, hiddenSegments = []) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvasEl.getBoundingClientRect();
+      canvasEl.width = Math.floor(rect.width * ratio);
+      canvasEl.height = Math.floor(rect.height * ratio);
+      const ctx = canvasEl.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const rows = map.length;
+      const cols = map[0].length;
+      const pad = 8;
+      const cell = sharedCell ?? Math.max(
+        8,
+        Math.min((rect.width - pad * 2) / cols, (rect.height - pad * 2) / rows)
+      );
+
+      const drawW = cols * cell;
+      const drawH = rows * cell;
+      const ox = (rect.width - drawW) / 2;
+      const oy = (rect.height - drawH) / 2;
+      const stroke = 'rgba(20,20,20,0.98)';
+      const fill = 'rgb(248,248,248)';
+      const hiddenStroke = 'rgba(70,70,70,0.82)';
+
+      function valueAt(r, c) {
+        if (r < 0 || c < 0 || r >= rows || c >= cols) return null;
+        return map[r][c];
+      }
+
+      function projectCell(r, c) {
+        if (mode === 'top') {
+          return { px: ox + c * cell, py: oy + r * cell };
+        }
+        return { px: ox + c * cell, py: oy + (rows - 1 - r) * cell };
+      }
+
+      function projectGridPoint(gx, gy) {
+        if (mode === 'top') {
+          return { px: ox + gx * cell, py: oy + gy * cell };
+        }
+        return { px: ox + gx * cell, py: oy + (rows - gy) * cell };
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+          const { px, py } = projectCell(r, c);
+          ctx.fillStyle = fill;
+          ctx.fillRect(px, py, cell, cell);
+        }
+      }
+
+      if (hiddenSegments.length) {
+        ctx.beginPath();
+        ctx.strokeStyle = hiddenStroke;
+        ctx.lineWidth = 1.1;
+        ctx.setLineDash([5, 4]);
+        for (const seg of hiddenSegments) {
+          const a = projectGridPoint(seg.x1, seg.y1);
+          const b = projectGridPoint(seg.x2, seg.y2);
+          ctx.moveTo(a.px, a.py);
+          ctx.lineTo(b.px, b.py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.6;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+
+          const { px, py } = projectCell(r, c);
+          const left = valueAt(r, c - 1);
+          const right = valueAt(r, c + 1);
+          const up = mode === 'top' ? valueAt(r - 1, c) : valueAt(r + 1, c);
+          const down = mode === 'top' ? valueAt(r + 1, c) : valueAt(r - 1, c);
+
+          if (left === null || left === -1 || left !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px, py + cell);
+          }
+          if (right === null || right === -1 || right !== val) {
+            ctx.moveTo(px + cell, py);
+            ctx.lineTo(px + cell, py + cell);
+          }
+          if (up === null || up === -1 || up !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px + cell, py);
+          }
+          if (down === null || down === -1 || down !== val) {
+            ctx.moveTo(px, py + cell);
+            ctx.lineTo(px + cell, py + cell);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    function dedupeSegments(segments) {
+      const seen = new Set();
+      const clean = [];
+      for (const seg of segments) {
+        const forward = `${seg.x1},${seg.y1},${seg.x2},${seg.y2}`;
+        const reverse = `${seg.x2},${seg.y2},${seg.x1},${seg.y1}`;
+        if (seen.has(forward) || seen.has(reverse)) continue;
+        seen.add(forward);
+        clean.push(seg);
+      }
+      return clean;
+    }
+
+    function transformSegments(segments, mode, rawRows, rawCols) {
+      if (mode === 'front') {
+        return dedupeSegments(segments.map(seg => ({
+          x1: rawCols - seg.x1,
+          y1: seg.y1,
+          x2: rawCols - seg.x2,
+          y2: seg.y2,
+        })));
+      }
+
+      if (mode === 'top') {
+        return dedupeSegments(segments.map(seg => ({
+          x1: rawRows - seg.y1,
+          y1: seg.x1,
+          x2: rawRows - seg.y2,
+          y2: seg.x2,
+        })));
+      }
+
+      return dedupeSegments(segments.map(seg => ({ ...seg })));
+    }
+
+    function computeHiddenSegments(occupiedSet, mode) {
+      const segments = [];
+
+      const has = (x, y, z) => occupiedSet.has(`${x},${y},${z}`);
+
+      if (mode === 'front') {
+        const nearest = (y, z) => {
+          for (let x = W - 1; x >= 0; x--) if (has(x, y, z)) return x;
+          return null;
+        };
+
+        for (let z = 0; z < H; z++) {
+          for (let yBoundary = 0; yBoundary <= D; yBoundary++) {
+            let hasDeeperBoundary = false;
+            for (let x = 0; x < W; x++) {
+              const left = yBoundary > 0 ? has(x, yBoundary - 1, z) : false;
+              const right = yBoundary < D ? has(x, yBoundary, z) : false;
+              if (left !== right) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const leftVisible = yBoundary > 0 ? nearest(yBoundary - 1, z) : null;
+            const rightVisible = yBoundary < D ? nearest(yBoundary, z) : null;
+            if (leftVisible === rightVisible && hasDeeperBoundary) {
+              segments.push({ x1: yBoundary, y1: z, x2: yBoundary, y2: z + 1 });
+            }
+          }
+        }
+
+        for (let zBoundary = 0; zBoundary <= H; zBoundary++) {
+          for (let y = 0; y < D; y++) {
+            let hasDeeperBoundary = false;
+            for (let x = 0; x < W; x++) {
+              const below = zBoundary > 0 ? has(x, y, zBoundary - 1) : false;
+              const above = zBoundary < H ? has(x, y, zBoundary) : false;
+              if (below !== above) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const belowVisible = zBoundary > 0 ? nearest(y, zBoundary - 1) : null;
+            const aboveVisible = zBoundary < H ? nearest(y, zBoundary) : null;
+            if (belowVisible === aboveVisible && hasDeeperBoundary) {
+              segments.push({ x1: y, y1: zBoundary, x2: y + 1, y2: zBoundary });
+            }
+          }
+        }
+
+        return segments;
+      }
+
+      if (mode === 'left') {
+        const nearest = (x, z) => {
+          for (let y = D - 1; y >= 0; y--) if (has(x, y, z)) return y;
+          return null;
+        };
+
+        for (let z = 0; z < H; z++) {
+          for (let xBoundary = 0; xBoundary <= W; xBoundary++) {
+            let hasDeeperBoundary = false;
+            for (let y = 0; y < D; y++) {
+              const left = xBoundary > 0 ? has(xBoundary - 1, y, z) : false;
+              const right = xBoundary < W ? has(xBoundary, y, z) : false;
+              if (left !== right) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const leftVisible = xBoundary > 0 ? nearest(xBoundary - 1, z) : null;
+            const rightVisible = xBoundary < W ? nearest(xBoundary, z) : null;
+            if (leftVisible === rightVisible && hasDeeperBoundary) {
+              segments.push({ x1: xBoundary, y1: z, x2: xBoundary, y2: z + 1 });
+            }
+          }
+        }
+
+        for (let zBoundary = 0; zBoundary <= H; zBoundary++) {
+          for (let x = 0; x < W; x++) {
+            let hasDeeperBoundary = false;
+            for (let y = 0; y < D; y++) {
+              const below = zBoundary > 0 ? has(x, y, zBoundary - 1) : false;
+              const above = zBoundary < H ? has(x, y, zBoundary) : false;
+              if (below !== above) {
+                hasDeeperBoundary = true;
+                break;
+              }
+            }
+            const belowVisible = zBoundary > 0 ? nearest(x, zBoundary - 1) : null;
+            const aboveVisible = zBoundary < H ? nearest(x, zBoundary) : null;
+            if (belowVisible === aboveVisible && hasDeeperBoundary) {
+              segments.push({ x1: x, y1: zBoundary, x2: x + 1, y2: zBoundary });
+            }
+          }
+        }
+
+        return segments;
+      }
+
+      const nearest = (x, y) => {
+        for (let z = H - 1; z >= 0; z--) if (has(x, y, z)) return z;
+        return null;
+      };
+
+      for (let y = 0; y < D; y++) {
+        for (let xBoundary = 0; xBoundary <= W; xBoundary++) {
+          let hasDeeperBoundary = false;
+          for (let z = 0; z < H; z++) {
+            const left = xBoundary > 0 ? has(xBoundary - 1, y, z) : false;
+            const right = xBoundary < W ? has(xBoundary, y, z) : false;
+            if (left !== right) {
+              hasDeeperBoundary = true;
+              break;
+            }
+          }
+          const leftVisible = xBoundary > 0 ? nearest(xBoundary - 1, y) : null;
+          const rightVisible = xBoundary < W ? nearest(xBoundary, y) : null;
+          if (leftVisible === rightVisible && hasDeeperBoundary) {
+            segments.push({ x1: xBoundary, y1: y, x2: xBoundary, y2: y + 1 });
+          }
+        }
+      }
+
+      for (let yBoundary = 0; yBoundary <= D; yBoundary++) {
+        for (let x = 0; x < W; x++) {
+          let hasDeeperBoundary = false;
+          for (let z = 0; z < H; z++) {
+            const below = yBoundary > 0 ? has(x, yBoundary - 1, z) : false;
+            const above = yBoundary < D ? has(x, yBoundary, z) : false;
+            if (below !== above) {
+              hasDeeperBoundary = true;
+              break;
+            }
+          }
+          const belowVisible = yBoundary > 0 ? nearest(x, yBoundary - 1) : null;
+          const aboveVisible = yBoundary < D ? nearest(x, yBoundary) : null;
+          if (belowVisible === aboveVisible && hasDeeperBoundary) {
+            segments.push({ x1: x, y1: yBoundary, x2: x + 1, y2: yBoundary });
+          }
+        }
+      }
+
+      return segments;
+    }
+
+    function makeSignature(occupiedData) {
+      return occupiedData.map(c => `${c.x},${c.y},${c.z}`).sort().join('|');
+    }
+
+    function buildDistinctBlocks(count) {
+      const blocks = [];
+      const signatures = new Set();
+      let guard = 0;
+
+      while (blocks.length < count && guard < 900) {
+        guard++;
+        const settings = makeRandomSettings();
+        const raw = buildAssembly(settings);
+        const simple = simplifyShape(raw);
+        const signature = `${makeSignature(simple)}::${Math.round(settings.removeAmt * 10)}${Math.round(settings.notchAmt * 10)}${Math.round(settings.biteAmt * 10)}${Math.round(settings.trenchAmt * 10)}${Math.round(settings.bridgeAmt * 10)}`;
+        if (signatures.has(signature)) continue;
+        signatures.add(signature);
+        blocks.push({
+          id: blocks.length + 1,
+          letter: BLOCK_LETTERS[blocks.length],
+          occupied: simple,
+          maps: buildMaps(simple),
+        });
+      }
+
+      return blocks;
+    }
+
+    function makeViewTiles(blocks) {
+      const tiles = [];
+      for (const block of blocks) {
+        const frontMap = transformProjectionMap(block.maps.frontMap, 'front');
+        const leftMap = transformProjectionMap(block.maps.leftMap, 'left');
+        const topMap = transformProjectionMap(block.maps.topMap, 'top');
+
+        tiles.push({
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'front',
+          map: frontMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'front'),
+            'front',
+            block.maps.frontMap.length,
+            block.maps.frontMap[0].length
+          ),
+        });
+        tiles.push({
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'left',
+          map: leftMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'left'),
+            'left',
+            block.maps.leftMap.length,
+            block.maps.leftMap[0].length
+          ),
+        });
+        tiles.push({
+          blockId: block.id,
+          letter: block.letter,
+          mode: 'top',
+          map: topMap,
+          hiddenSegments: transformSegments(
+            computeHiddenSegments(block.maps.occupiedSet, 'top'),
+            'top',
+            block.maps.topMap.length,
+            block.maps.topMap[0].length
+          ),
+        });
+      }
+      return shuffle(tiles);
+    }
+
+    function pad2(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function formatTimestampParts(date) {
+      const y = date.getFullYear();
+      const m = pad2(date.getMonth() + 1);
+      const d = pad2(date.getDate());
+      const hh = pad2(date.getHours());
+      const mm = pad2(date.getMinutes());
+      const ss = pad2(date.getSeconds());
+      return {
+        compact: `${y}${m}${d}-${hh}${mm}${ss}`,
+        display: `${d}/${m}/${y} ${hh}:${mm}:${ss}`,
+      };
+    }
+
+    function buildUniqueWorksheetBlocks(count) {
+      const blocks = [];
+      const signatures = new Set();
+      let guard = 0;
+
+      while (blocks.length < count && guard < 3600) {
+        guard++;
+        const settings = makeRandomSettings();
+        const raw = buildAssembly(settings);
+        const simple = simplifyShape(raw);
+        const signature = `${makeSignature(simple)}::${Math.round(settings.removeAmt * 10)}${Math.round(settings.notchAmt * 10)}${Math.round(settings.biteAmt * 10)}${Math.round(settings.trenchAmt * 10)}${Math.round(settings.bridgeAmt * 10)}${Math.round(settings.pillarAmt * 10)}`;
+        if (signatures.has(signature)) continue;
+        signatures.add(signature);
+        blocks.push({
+          occupied: simple,
+          maps: buildMaps(simple),
+        });
+      }
+
+      while (blocks.length < count) {
+        const raw = buildAssembly(makeRandomSettings());
+        const simple = simplifyShape(raw);
+        blocks.push({
+          occupied: simple,
+          maps: buildMaps(simple),
+        });
+      }
+
+      return blocks;
+    }
+
+    function createWorksheetRecord(block, sheetNo, totalSheets, stampParts) {
+      const sheetCode = `${stampParts.compact}-S${String(sheetNo).padStart(2, '0')}`;
+
+      const topView = {
+        map: transformProjectionMap(block.maps.topMap, 'top'),
+        hiddenSegments: transformSegments(
+          computeHiddenSegments(block.maps.occupiedSet, 'top'),
+          'top',
+          block.maps.topMap.length,
+          block.maps.topMap[0].length
+        ),
+      };
+
+      const lowerLeftView = {
+        map: transformProjectionMap(block.maps.leftMap, 'left'),
+        hiddenSegments: transformSegments(
+          computeHiddenSegments(block.maps.occupiedSet, 'left'),
+          'left',
+          block.maps.leftMap.length,
+          block.maps.leftMap[0].length
+        ),
+      };
+
+      const lowerRightView = {
+        map: transformProjectionMap(block.maps.frontMap, 'front'),
+        hiddenSegments: transformSegments(
+          computeHiddenSegments(block.maps.occupiedSet, 'front'),
+          'front',
+          block.maps.frontMap.length,
+          block.maps.frontMap[0].length
+        ),
+      };
+
+      return {
+        type: 'worksheet',
+        sheetNo,
+        totalSheets,
+        sheetCode,
+        stampDisplay: stampParts.display,
+        block,
+        views: {
+          top: topView,
+          side: lowerLeftView,
+          front: lowerRightView,
+        },
+      };
+    }
+
+    function drawIsometricGuideCanvas(canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const w = rect.width;
+      const h = rect.height;
+      const spacing = Math.max(16, Math.min(28, Math.round(Math.min(w, h) / 18)));
+
+      function drawFamily(angleRad) {
+        const vx = Math.cos(angleRad);
+        const vy = Math.sin(angleRad);
+        const nx = -vy;
+        const ny = vx;
+        const corners = [[0, 0], [w, 0], [0, h], [w, h]];
+        let minD = Infinity;
+        let maxD = -Infinity;
+
+        for (const [cx, cy] of corners) {
+          const d = cx * nx + cy * ny;
+          minD = Math.min(minD, d);
+          maxD = Math.max(maxD, d);
+        }
+
+        const len = Math.hypot(w, h) * 2;
+        ctx.beginPath();
+        for (let d = Math.floor(minD / spacing) * spacing; d <= maxD; d += spacing) {
+          const px = nx * d;
+          const py = ny * d;
+          ctx.moveTo(px - vx * len, py - vy * len);
+          ctx.lineTo(px + vx * len, py + vy * len);
+        }
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(80, 80, 80, 0.18)';
+      ctx.lineWidth = 0.9;
+      drawFamily(Math.PI / 2);
+      drawFamily(Math.PI / 6);
+      drawFamily(5 * Math.PI / 6);
+
+      ctx.strokeStyle = 'rgba(20, 20, 20, 0.95)';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(0.7, 0.7, w - 1.4, h - 1.4);
+    }
+
+    function createWorksheetElement(record) {
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      sheet.innerHTML = `
+        <div class="layout">
+          <div class="leftCol">
+            <section class="section">
+              <div class="sectionTitle">Orthographic views</div>
+              <div class="orthoWrap"><canvas class="orthoCanvas" data-ortho="main"></canvas></div>
+            </section>
+
+            <div class="infoBox">
+              <h1>Draw the Isometric View</h1>
+              <p><strong>Instructions:</strong> Use the labelled third-angle orthographic views to draw the isometric block in the space on the right.</p>
+              <p><strong>Colour task:</strong> Colour matching faces or matching parts of the shape the same colour on both sides. Use the labels to identify plan, front, and side view.</p>
+              <p><strong>Hidden lines</strong> are dashed. Light construction, projection, and 45-degree bounce lines are included to help transfer sizes between views.</p>
+              <div class="metaGrid">
+                <div class="metaCell"><strong>Generated:</strong><span>${record.stampDisplay}</span></div>
+                <div class="metaCell"><strong>Sheet:</strong><span>${record.sheetNo} of ${record.totalSheets}</span></div>
+                <div class="metaCell"><strong>Sheet ID:</strong><span>${record.sheetCode}</span></div>
+              </div>
+              <div class="infoFields">
+                <div class="field"><strong>Name:</strong><span class="line"></span></div>
+                <div class="field"><strong>Class:</strong><span class="line"></span></div>
+                <div class="field"><strong>Date:</strong><span class="line"></span></div>
+              </div>
+            </div>
+          </div>
+
+          <section class="section studentSection">
+            <div class="sectionTitle">Draw the isometric view here</div>
+            <div class="studentDrawWrap"><canvas class="studentIsoCanvas"></canvas></div>
+          </section>
+        </div>
+
+        <div class="printRow">
+          <button type="button" class="printSinglePageBtn">Print this worksheet</button>
+        </div>
+      `;
+
+      sheet.querySelector('.printSinglePageBtn').addEventListener('click', () => {
+        buildPreviewWorksheet(record.sheetNo);
+        printAfterRender();
+      });
+
+      return sheet;
+    }
+
+    function createAnswerSheet(records, stampParts) {
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet answerSheet';
+
+      const rows = records.map((record, index) => `
+        <tr>
+          <td>${record.sheetNo}</td>
+          <td>${record.sheetCode}</td>
+          <td>${record.stampDisplay}</td>
+          <td>
+            <canvas class="answerThumb" data-answer-index="${index}"></canvas>
+            <div class="answerNote">Correct isometric view for this worksheet.</div>
+          </td>
+        </tr>
+      `).join('');
+
+      sheet.innerHTML = `
+        <div class="answerHeader">
+          <h1>Reliever Answer Sheet</h1>
+          <p><strong>Pack generated:</strong> ${stampParts.display}</p>
+          <p><strong>Total worksheet pages:</strong> ${records.length}</p>
+          <p>Match the student sheet ID to the correct row below, then compare the student's drawing to the isometric answer.</p>
+        </div>
+        <table class="answerTable">
+          <thead>
+            <tr>
+              <th style="width: 8%;">Sheet</th>
+              <th style="width: 20%;">Sheet ID</th>
+              <th style="width: 18%;">Generated</th>
+              <th>Answer</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      return sheet;
+    }
+
+    function getMapDimensions(map) {
+      return { rows: map.length, cols: map[0].length };
+    }
+
+    function drawProjectionAt(ctx, map, mode, cell, ox, oy, hiddenSegments = [], opts = {}) {
+      const rows = map.length;
+      const cols = map[0].length;
+      const stroke = opts.stroke || 'rgba(20,20,20,0.98)';
+      const fill = opts.fill || 'rgb(248,248,248)';
+      const hiddenStroke = opts.hiddenStroke || 'rgba(70,70,70,0.82)';
+      const lineWidth = opts.lineWidth || 1.6;
+      const hiddenWidth = opts.hiddenWidth || 1.05;
+
+      function valueAt(r, c) {
+        if (r < 0 || c < 0 || r >= rows || c >= cols) return null;
+        return map[r][c];
+      }
+
+      function projectCell(r, c) {
+        if (mode === 'top') {
+          return { px: ox + c * cell, py: oy + r * cell };
+        }
+        return { px: ox + c * cell, py: oy + (rows - 1 - r) * cell };
+      }
+
+      function projectGridPoint(gx, gy) {
+        if (mode === 'top') {
+          return { px: ox + gx * cell, py: oy + gy * cell };
+        }
+        return { px: ox + gx * cell, py: oy + (rows - gy) * cell };
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+          const { px, py } = projectCell(r, c);
+          ctx.fillStyle = fill;
+          ctx.fillRect(px, py, cell, cell);
+        }
+      }
+
+      if (hiddenSegments.length) {
+        ctx.beginPath();
+        ctx.strokeStyle = hiddenStroke;
+        ctx.lineWidth = hiddenWidth;
+        ctx.setLineDash([4.5, 3.5]);
+        for (const seg of hiddenSegments) {
+          const a = projectGridPoint(seg.x1, seg.y1);
+          const b = projectGridPoint(seg.x2, seg.y2);
+          ctx.moveTo(a.px, a.py);
+          ctx.lineTo(b.px, b.py);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lineWidth;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const val = map[r][c];
+          if (val === null || val === -1) continue;
+
+          const { px, py } = projectCell(r, c);
+          const left = valueAt(r, c - 1);
+          const right = valueAt(r, c + 1);
+          const up = mode === 'top' ? valueAt(r - 1, c) : valueAt(r + 1, c);
+          const down = mode === 'top' ? valueAt(r + 1, c) : valueAt(r - 1, c);
+
+          if (left === null || left === -1 || left !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px, py + cell);
+          }
+          if (right === null || right === -1 || right !== val) {
+            ctx.moveTo(px + cell, py);
+            ctx.lineTo(px + cell, py + cell);
+          }
+          if (up === null || up === -1 || up !== val) {
+            ctx.moveTo(px, py);
+            ctx.lineTo(px + cell, py);
+          }
+          if (down === null || down === -1 || down !== val) {
+            ctx.moveTo(px, py + cell);
+            ctx.lineTo(px + cell, py + cell);
+          }
+        }
+      }
+      ctx.stroke();
+
+      return {
+        x: ox,
+        y: oy,
+        w: cols * cell,
+        h: rows * cell,
+        rows,
+        cols,
+      };
+    }
+
+    function drawLabel(ctx, text, x, y) {
+      ctx.save();
+      ctx.fillStyle = '#111';
+      ctx.font = '700 13px Arial, Helvetica, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawThirdAngleSheet(canvas, record) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const front = record.views.front;
+      const top = record.views.top;
+      const side = record.views.side;
+
+      const frontDims = getMapDimensions(front.map);
+      const topDims = getMapDimensions(top.map);
+      const sideDims = getMapDimensions(side.map);
+
+      const marginX = 8;
+      const marginY = 6;
+      const lowerLabelGap = 24;
+      const gap = 36;
+
+      const usableW = Math.max(180, rect.width - marginX * 2);
+      const usableH = Math.max(180, rect.height - marginY * 2 - lowerLabelGap);
+
+      let cell = Math.min(
+        (usableW - gap) / (sideDims.cols + Math.max(frontDims.cols, topDims.cols)),
+        (usableH - gap) / (topDims.rows + frontDims.rows)
+      );
+      cell = Math.max(8, Math.min(cell, 72));
+
+      const sharedW = Math.max(frontDims.cols, topDims.cols) * cell;
+      const frontW = frontDims.cols * cell;
+      const frontH = frontDims.rows * cell;
+      const topW = topDims.cols * cell;
+      const topH = topDims.rows * cell;
+      const sideW = sideDims.cols * cell;
+      const sideH = sideDims.rows * cell;
+
+      const totalW = sideW + gap + sharedW;
+      const totalH = topH + gap + frontH + lowerLabelGap;
+      const originX = (rect.width - totalW) / 2;
+      const originY = (rect.height - totalH) / 2 + 1;
+
+      const frontX = originX + sideW + gap;
+      const frontY = originY + topH + gap;
+      const topX = frontX;
+      const topY = originY;
+      const sideX = frontX - gap - sideW;
+      const sideY = frontY + (frontH - sideH);
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(120,120,120,0.40)';
+      ctx.lineWidth = 0.9;
+      ctx.setLineDash([2, 3]);
+
+      const projectionCols = Math.min(topDims.cols, frontDims.cols);
+      for (let i = 0; i <= projectionCols; i++) {
+        const x = topX + i * cell;
+        ctx.beginPath();
+        ctx.moveTo(x, topY + topH + 4);
+        ctx.lineTo(x, frontY - 4);
+        ctx.stroke();
+      }
+
+      const projectionRows = Math.min(frontDims.rows, sideDims.rows);
+      for (let i = 0; i <= projectionRows; i++) {
+        const y = frontY + i * cell;
+        ctx.beginPath();
+        ctx.moveTo(sideX + sideW + 4, y);
+        ctx.lineTo(frontX - 4, y);
+        ctx.stroke();
+      }
+
+      const cornerX = frontX;
+      const cornerY = frontY;
+      const miterStartX = cornerX - (gap + topH);
+      const miterStartY = cornerY - (gap + topH);
+      ctx.beginPath();
+      ctx.moveTo(miterStartX, miterStartY);
+      ctx.lineTo(cornerX, cornerY);
+      ctx.stroke();
+
+      const transferRows = Math.min(topDims.rows, sideDims.cols);
+      for (let i = 0; i <= transferRows; i++) {
+        const y = topY + i * cell;
+        const miterX = cornerX - (cornerY - y);
+        ctx.beginPath();
+        ctx.moveTo(miterX, y);
+        ctx.lineTo(topX - 4, y);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(miterX, y);
+        ctx.lineTo(miterX, sideY - 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      drawProjectionAt(ctx, top.map, 'top', cell, topX, topY, top.hiddenSegments, { lineWidth: 1.6, hiddenWidth: 1.0 });
+      drawProjectionAt(ctx, front.map, 'front', cell, frontX, frontY, front.hiddenSegments, { lineWidth: 1.6, hiddenWidth: 1.0 });
+      drawProjectionAt(ctx, side.map, 'left', cell, sideX, sideY, side.hiddenSegments, { lineWidth: 1.6, hiddenWidth: 1.0 });
+
+      drawLabel(ctx, 'PLAN', topX + topW / 2, topY + topH + 8);
+      drawLabel(ctx, 'ELEVATION', frontX + frontW / 2, frontY + frontH + 8);
+      drawLabel(ctx, 'END ELEV.', sideX + sideW / 2, sideY + sideH + 8);
+    }
+
+    function renderWorksheetElement(record, element) {
+      const orthoCanvas = element.querySelector('[data-ortho="main"]');
+      drawThirdAngleSheet(orthoCanvas, record);
+      drawIsometricGuideCanvas(element.querySelector('.studentIsoCanvas'));
+    }
+
+    function renderAnswerSheetElement(records, element) {
+      const thumbs = [...element.querySelectorAll('[data-answer-index]')];
+      thumbs.forEach((canvas, index) => {
+        const record = records[index];
+        if (!record) return;
+        renderIsoCanvas(canvas, record.block.occupied);
+      });
+    }
+
+    function rerenderAllPages() {
+      state.renderedPages.forEach(entry => {
+        if (entry.type === 'worksheet') {
+          renderWorksheetElement(entry.record, entry.element);
+        } else if (entry.type === 'answer') {
+          renderAnswerSheetElement(entry.records, entry.element);
+        }
+      });
+    }
+
+    function mountPages(entries) {
+      pagesContainer.innerHTML = '';
+      state.renderedPages = entries;
+      for (const entry of entries) {
+        pagesContainer.appendChild(entry.element);
+      }
+      rerenderAllPages();
+    }
+
+    function buildPreviewWorksheet(sheetNo = 1) {
+      const stampParts = formatTimestampParts(new Date());
+      const block = buildUniqueWorksheetBlocks(1)[0];
+      const record = createWorksheetRecord(block, sheetNo, 1, stampParts);
+      const element = createWorksheetElement(record);
+      mountPages([{ type: 'worksheet', record, element }]);
+    }
+
+    function buildRelieverPack(pageCount) {
+      const safeCount = Math.max(1, Math.min(40, pageCount));
+      const stampParts = formatTimestampParts(new Date());
+      const blocks = buildUniqueWorksheetBlocks(safeCount);
+      const entries = [];
+      const records = [];
+
+      for (let i = 1; i <= safeCount; i++) {
+        const record = createWorksheetRecord(blocks[i - 1], i, safeCount, stampParts);
+        const element = createWorksheetElement(record);
+        records.push(record);
+        entries.push({ type: 'worksheet', record, element });
+      }
+
+      const answerElement = createAnswerSheet(records, stampParts);
+      entries.push({ type: 'answer', records, element: answerElement });
+      mountPages(entries);
+    }
+
+    function printAfterRender() {
+      applyPrintMode();
+      requestAnimationFrame(() => {
+        rerenderAllPages();
+        requestAnimationFrame(() => window.print());
+      });
+    }
+
+    function getRequestedPackCount() {
+      return Math.max(1, Math.min(40, Number(packCountInput.value) || 1));
+    }
+
+    printSizeSelect.addEventListener('change', applyPrintMode);
+    newBtn.addEventListener('click', () => buildPreviewWorksheet(1));
+
+    printBtn.addEventListener('click', () => {
+      buildPreviewWorksheet(1);
+      printAfterRender();
+    });
+
+    printPackBtn.addEventListener('click', () => {
+      buildRelieverPack(getRequestedPackCount());
+      printAfterRender();
+    });
+
+    window.addEventListener('resize', rerenderAllPages);
+    window.addEventListener('beforeprint', () => {
+      applyPrintMode();
+      rerenderAllPages();
+    });
+
+    applyPrintMode();
+    buildPreviewWorksheet(1);
+  </script>
+</body>
+</html>
