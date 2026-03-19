@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orthographic Build-It Mode</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #eef2f7;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --text: #152033;
+      --muted: #5f6b7a;
+      --line: #cad5e2;
+      --accent: #1d4ed8;
+      --accent-soft: #dbeafe;
+      --good: #166534;
+      --good-soft: #dcfce7;
+      --bad: #b91c1c;
+      --bad-soft: #fee2e2;
+      --warn: #92400e;
+      --warn-soft: #fef3c7;
+      --shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: linear-gradient(180deg, #f5f7fb 0%, #e9eef6 100%);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+    }
+    body { padding: 18px; }
+    .app { width: min(1480px, calc(100vw - 24px)); margin: 0 auto; display: grid; gap: 16px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .topbar {
+      padding: 14px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px 18px;
+      align-items: center;
+    }
+    .titleWrap h1 { margin: 0; font-size: clamp(24px, 2.8vw, 36px); line-height: 1.04; }
+    .titleWrap p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .topStats { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+    .stat {
+      min-width: 118px;
+      padding: 10px 12px;
+      border-radius: 16px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+    .statLabel {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .statValue { font-size: 22px; font-weight: 800; line-height: 1; }
+    .game {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .sidebar, .board { padding: 16px; }
+    .subtleTitle {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .focusCard {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: 20px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .focusHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .focusHeader h2 { margin: 0; font-size: 20px; }
+    .focusStatus {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .orthoGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .orthoCard, .previewCard, .layerCard, .legendCard, .controlsCard, .boardCard {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px;
+    }
+    .orthoCard canvas, .previewCard canvas {
+      width: 100%;
+      height: 150px;
+      display: block;
+      background: #fff;
+      border-radius: 12px;
+    }
+    .orthoLabel {
+      margin-top: 8px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .helperCard {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      padding: 14px;
+      margin-top: 14px;
+    }
+    .helperCard p, .legendCard p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .boardHeader {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .boardHeader h2 { margin: 0; font-size: 22px; }
+    .selectionInfo { color: var(--muted); font-size: 14px; }
+    .buildLayout { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+    .gridWrap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(58px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .cellBtn {
+      aspect-ratio: 1;
+      border-radius: 14px;
+      border: 2px solid var(--line);
+      background: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .cellBtn:hover { transform: translateY(-1px); }
+    .cellBtn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .cellBtn.topCube { box-shadow: inset 0 0 0 2px rgba(29,78,216,0.14); }
+    .cellBtn.supportOnly { color: #8b95a4; }
+    .cellBtn.diffCorrect { border-color: #86efac; background: var(--good-soft); color: var(--good); }
+    .cellBtn.diffMissing { border-color: #f59e0b; background: var(--warn-soft); color: var(--warn); }
+    .cellBtn.diffExtra { border-color: #fca5a5; background: var(--bad-soft); color: var(--bad); }
+    .layerRow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .layerBtn {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 800;
+    }
+    .layerBtn.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button {
+      border: 1px solid transparent;
+      border-radius: 14px;
+      padding: 12px 16px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    .primaryBtn { background: var(--accent); color: #fff; }
+    .ghostBtn { background: #fff; color: var(--text); border-color: var(--line); }
+    .goodBtn { background: var(--good); color: #fff; }
+    .messageBar {
+      min-height: 46px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      line-height: 1.4;
+      margin-top: 14px;
+    }
+    .messageBar.good { border-color: #86efac; background: var(--good-soft); color: var(--good); }
+    .messageBar.bad { border-color: #fca5a5; background: var(--bad-soft); color: var(--bad); }
+    .messageBar.warn { border-color: #fcd34d; background: var(--warn-soft); color: var(--warn); }
+    .miniStats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .hintList { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+    .smallNote { color: var(--muted); font-size: 13px; line-height: 1.4; }
+    @media (max-width: 1100px) {
+      .game, .buildLayout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      body { padding: 10px; }
+      .app { width: 100%; }
+      .orthoGrid, .miniStats, .layerRow { grid-template-columns: 1fr; }
+      .gridWrap { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel topbar">
+      <div class="titleWrap">
+        <h1>Orthographic Build-It Mode</h1>
+        <p>Read the front, left, and top views. Then build the hidden 3D shape layer by layer.</p>
+      </div>
+      <div class="topStats">
+        <div class="stat">
+          <div class="statLabel">Challenge</div>
+          <div class="statValue" id="challengeNum">1</div>
+        </div>
+        <div class="stat">
+          <div class="statLabel">Checks</div>
+          <div class="statValue" id="checkCount">0</div>
+        </div>
+        <div class="stat">
+          <div class="statLabel">Built cubes</div>
+          <div class="statValue" id="cubeCount">0</div>
+        </div>
+        <div class="stat">
+          <div class="statLabel">Layer</div>
+          <div class="statValue" id="layerDisplay">1</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="game">
+      <aside class="panel sidebar">
+        <div class="subtleTitle">Target views</div>
+        <div class="focusCard">
+          <div class="focusHeader">
+            <h2 id="focusTitle">Build the mystery block</h2>
+            <div class="focusStatus" id="focusStatus">Layer 1</div>
+          </div>
+          <div class="orthoGrid">
+            <div class="orthoCard">
+              <canvas id="frontCanvas"></canvas>
+              <div class="orthoLabel">Front</div>
+            </div>
+            <div class="orthoCard">
+              <canvas id="leftCanvas"></canvas>
+              <div class="orthoLabel">Left</div>
+            </div>
+            <div class="orthoCard">
+              <canvas id="topCanvas"></canvas>
+              <div class="orthoLabel">Top</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="previewCard">
+          <div class="subtleTitle">Live build preview</div>
+          <canvas id="buildPreview"></canvas>
+          <div class="smallNote">This shows the shape you have built so far.</div>
+        </div>
+
+        <div class="helperCard">
+          <p><strong>Build-It idea:</strong> instead of selecting the answer, the student constructs the shape from the three orthographic views.</p>
+          <p><strong>How layers work:</strong> choose a layer, then click cells to add or remove cubes on that level. Upper layers need support underneath.</p>
+        </div>
+      </aside>
+
+      <section class="panel board">
+        <div class="boardHeader">
+          <div>
+            <h2>Build board</h2>
+            <div class="selectionInfo">Top-down footprint. Columns run left to right. Rows run front to back.</div>
+          </div>
+        </div>
+
+        <div class="buildLayout">
+          <div class="boardCard">
+            <div class="subtleTitle">Selected layer grid</div>
+            <div class="smallNote">Click a square to toggle a cube on the selected layer.</div>
+            <div class="gridWrap" id="gridWrap"></div>
+            <div class="messageBar" id="messageBar">Start building from layer 1 using the top view as your footprint guide.</div>
+          </div>
+
+          <div style="display:grid; gap:14px;">
+            <div class="layerCard">
+              <div class="subtleTitle">Layers</div>
+              <div class="smallNote">Layer 1 is the base. Higher layers stack upward.</div>
+              <div class="layerRow" id="layerRow"></div>
+            </div>
+
+            <div class="legendCard">
+              <div class="subtleTitle">Reading the grid</div>
+              <ul class="hintList">
+                <li><strong>Blue</strong> = cube placed on this layer</li>
+                <li><strong>Grey number</strong> = lower layers already filled</li>
+                <li><strong>Blank</strong> = nothing at this position yet</li>
+              </ul>
+            </div>
+
+            <div class="controlsCard">
+              <div class="subtleTitle">Controls</div>
+              <div class="miniStats">
+                <div class="stat"><div class="statLabel">Target cubes</div><div class="statValue" id="targetCount">0</div></div>
+                <div class="stat"><div class="statLabel">Solved</div><div class="statValue" id="solvedCount">0</div></div>
+              </div>
+              <div class="actions">
+                <button class="primaryBtn" id="checkBtn" type="button">Check build</button>
+                <button class="ghostBtn" id="newBtn" type="button">New challenge</button>
+                <button class="ghostBtn" id="clearLayerBtn" type="button">Clear layer</button>
+                <button class="ghostBtn" id="clearAllBtn" type="button">Clear build</button>
+                <button class="goodBtn" id="revealBtn" type="button">Reveal answer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script>
+    const W = 4;
+    const D = 6;
+    const H = 4;
+    const TILE_W = 32;
+    const TILE_H = 16;
+    const CUBE_H = 20;
+    const PRESET = {
+      topBias: 0.4,
+      removeAmt: 0.6,
+      clusterAmt: 0.5,
+      slopeAmt: 1,
+      terraceAmt: 0.55,
+      notchAmt: 0.52,
+      pillarAmt: 0.36,
+      bridgeAmt: 0.3,
+    };
+
+    function randBetween(min, max) { return min + Math.random() * (max - min); }
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function shuffle(array) {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+    function makeRandomSettings(base = PRESET) {
+      return {
+        topBias: clamp(base.topBias + randBetween(-0.28, 0.34), 0.08, 0.92),
+        removeAmt: clamp(base.removeAmt + randBetween(-0.18, 0.2), 0.34, 0.82),
+        clusterAmt: clamp(base.clusterAmt + randBetween(-0.28, 0.28), 0.14, 0.92),
+        slopeAmt: clamp(base.slopeAmt + randBetween(-0.48, 0.18), 0.28, 1.2),
+        terraceAmt: clamp((base.terraceAmt ?? 0.55) + randBetween(-0.28, 0.28), 0.08, 0.95),
+        notchAmt: clamp((base.notchAmt ?? 0.52) + randBetween(-0.28, 0.28), 0.1, 0.95),
+        pillarAmt: clamp((base.pillarAmt ?? 0.36) + randBetween(-0.2, 0.32), 0.05, 0.9),
+        bridgeAmt: clamp((base.bridgeAmt ?? 0.3) + randBetween(-0.16, 0.28), 0.02, 0.86),
+      };
+    }
+
+    const els = {
+      challengeNum: document.getElementById('challengeNum'),
+      checkCount: document.getElementById('checkCount'),
+      cubeCount: document.getElementById('cubeCount'),
+      layerDisplay: document.getElementById('layerDisplay'),
+      focusStatus: document.getElementById('focusStatus'),
+      frontCanvas: document.getElementById('frontCanvas'),
+      leftCanvas: document.getElementById('leftCanvas'),
+      topCanvas: document.getElementById('topCanvas'),
+      buildPreview: document.getElementById('buildPreview'),
+      gridWrap: document.getElementById('gridWrap'),
+      layerRow: document.getElementById('layerRow'),
+      messageBar: document.getElementById('messageBar'),
+      targetCount: document.getElementById('targetCount'),
+      solvedCount: document.getElementById('solvedCount'),
+      checkBtn: document.getElementById('checkBtn'),
+      newBtn: document.getElementById('newBtn'),
+      clearLayerBtn: document.getElementById('clearLayerBtn'),
+      clearAllBtn: document.getElementById('clearAllBtn'),
+      revealBtn: document.getElementById('revealBtn')
+    };
+
+    const state = {
+      challenge: 1,
+      solved: 0,
+      checks: 0,
+      selectedLayer: 0,
+      target: null,
+      build: [],
+      revealMode: false,
+    };
+
+    function setMessage(text, tone = '') {
+      els.messageBar.textContent = text;
+      els.messageBar.className = `messageBar${tone ? ` ${tone}` : ''}`;
+    }
+
+    function iso(x, y, z, originX, originY) {
+      return {
+        x: originX + (x - y) * TILE_W,
+        y: originY + (x + y) * TILE_H - z * CUBE_H,
+      };
+    }
+
+    function computeIsoBounds(occupiedData) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const c of occupiedData) {
+        const p = iso(c.x, c.y, c.z, 0, 0);
+        minX = Math.min(minX, p.x - TILE_W - 2);
+        maxX = Math.max(maxX, p.x + TILE_W + 2);
+        minY = Math.min(minY, p.y - 2);
+        maxY = Math.max(maxY, p.y + TILE_H * 2 + CUBE_H + 2);
+      }
+      if (!occupiedData.length) minX = minY = 0, maxX = maxY = 1;
+      return { minX, maxX, minY, maxY };
+    }
+
+    function drawCube(ctx, x, y, z, originX, originY, occupiedSet) {
+      const p = iso(x, y, z, originX, originY);
+      const top = 'rgb(248,248,248)';
+      const left = 'rgb(232,232,232)';
+      const right = 'rgb(214,214,214)';
+      const stroke = 'rgba(20,20,20,0.96)';
+      const hasTop = occupiedSet.has(`${x},${y},${z + 1}`);
+      const hasLeftNeighbor = occupiedSet.has(`${x},${y + 1},${z}`);
+      const hasRightNeighbor = occupiedSet.has(`${x + 1},${y},${z}`);
+      if (!hasTop) {
+        const a = { x: p.x, y: p.y }, b = { x: p.x + TILE_W, y: p.y + TILE_H }, c = { x: p.x, y: p.y + TILE_H * 2 }, d = { x: p.x - TILE_W, y: p.y + TILE_H };
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fillStyle = top; ctx.fill();
+        ctx.beginPath(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.4; ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.stroke();
+      }
+      if (!hasLeftNeighbor) {
+        const a = { x: p.x - TILE_W, y: p.y + TILE_H }, b = { x: p.x, y: p.y + TILE_H * 2 }, c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H }, d = { x: p.x - TILE_W, y: p.y + TILE_H + CUBE_H };
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fillStyle = left; ctx.fill();
+        ctx.beginPath(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.4; ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.stroke();
+      }
+      if (!hasRightNeighbor) {
+        const a = { x: p.x + TILE_W, y: p.y + TILE_H }, b = { x: p.x, y: p.y + TILE_H * 2 }, c = { x: p.x, y: p.y + TILE_H * 2 + CUBE_H }, d = { x: p.x + TILE_W, y: p.y + TILE_H + CUBE_H };
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fillStyle = right; ctx.fill();
+        ctx.beginPath(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.4; ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.stroke();
+      }
+    }
+
+    function renderIsoCanvas(canvas, occupiedData) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const bounds = computeIsoBounds(occupiedData);
+      const availableW = rect.width - 22;
+      const availableH = rect.height - 22;
+      const shapeW = bounds.maxX - bounds.minX;
+      const shapeH = bounds.maxY - bounds.minY;
+      const scale = Math.min(availableW / shapeW, availableH / shapeH, 1.56);
+      ctx.save();
+      ctx.translate(rect.width / 2, rect.height / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-(bounds.minX + shapeW / 2), -(bounds.minY + shapeH / 2));
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+      const sorted = [...occupiedData].sort((a, b) => (a.x + a.y + a.z * 0.01) - (b.x + b.y + b.z * 0.01) || a.z - b.z);
+      for (const cube of sorted) drawCube(ctx, cube.x, cube.y, cube.z, 0, 0, occupiedSet);
+      ctx.restore();
+    }
+
+    function buildAssembly(settings) {
+      const grid = Array.from({ length: H }, () => Array.from({ length: D }, () => Array.from({ length: W }, () => true)));
+      function inBounds(x, y, z) { return x >= 0 && x < W && y >= 0 && y < D && z >= 0 && z < H; }
+      function isOccupied(x, y, z) { return inBounds(x, y, z) && grid[z][y][x]; }
+      function setOccupied(x, y, z, value) { if (inBounds(x, y, z)) grid[z][y][x] = value; }
+      function neighborCoords(x, y, z) { return [[x - 1, y, z], [x + 1, y, z], [x, y - 1, z], [x, y + 1, z], [x, y, z - 1], [x, y, z + 1]]; }
+      function countNeighbors(x, y, z) { return neighborCoords(x, y, z).filter(([nx, ny, nz]) => isOccupied(nx, ny, nz)).length; }
+      function footprintCount() {
+        let count = 0;
+        for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) for (let z = 0; z < H; z++) if (grid[z][y][x]) { count++; break; }
+        return count;
+      }
+      function occupiedCount() {
+        let count = 0;
+        for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (grid[z][y][x]) count++;
+        return count;
+      }
+      function firstOccupied() {
+        for (let z0 = 0; z0 < H; z0++) for (let y0 = 0; y0 < D; y0++) for (let x0 = 0; x0 < W; x0++) if (grid[z0][y0][x0]) return [x0, y0, z0];
+        return null;
+      }
+      function allOccupiedCoords() {
+        const result = [];
+        for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (grid[z][y][x]) result.push({ x, y, z });
+        return result;
+      }
+      function hasSpanAcrossX() {
+        const left = new Set(), right = new Set();
+        for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) { if (grid[z][y][0]) left.add(`${y},${z}`); if (grid[z][y][W - 1]) right.add(`${y},${z}`); }
+        return left.size > 0 && right.size > 0;
+      }
+      function hasSpanAcrossY() {
+        const front = new Set(), back = new Set();
+        for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) { if (grid[z][0][x]) front.add(`${x},${z}`); if (grid[z][D - 1][x]) back.add(`${x},${z}`); }
+        return front.size > 0 && back.size > 0;
+      }
+      function canRemove(x, y, z) {
+        if (!isOccupied(x, y, z)) return false;
+        grid[z][y][x] = false;
+        let valid = true;
+        const start = firstOccupied();
+        if (!start) { grid[z][y][x] = true; return false; }
+        const seen = new Set();
+        const q = [start];
+        seen.add(start.join(','));
+        while (q.length) {
+          const [cx, cy, cz] = q.shift();
+          for (const [nx, ny, nz] of neighborCoords(cx, cy, cz)) {
+            const key = `${nx},${ny},${nz}`;
+            if (!isOccupied(nx, ny, nz) || seen.has(key)) continue;
+            seen.add(key); q.push([nx, ny, nz]);
+          }
+        }
+        for (let zz = 0; zz < H && valid; zz++) for (let yy = 0; yy < D && valid; yy++) for (let xx = 0; xx < W && valid; xx++) {
+          if (!grid[zz][yy][xx]) continue;
+          const supported = zz === 0 || grid[zz - 1][yy][xx];
+          const attachedCount = countNeighbors(xx, yy, zz);
+          const connected = seen.has(`${xx},${yy},${zz}`);
+          if (!supported || attachedCount <= 1 || !connected) valid = false;
+        }
+        if (footprintCount() < 6) valid = false;
+        grid[z][y][x] = true;
+        return valid;
+      }
+      function isEdgeCell(x, y, z) { return x === 0 || x === W - 1 || y === 0 || y === D - 1 || z === 0 || z === H - 1; }
+      function carvedSetForLayer(z) {
+        const set = new Set();
+        for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (!grid[z][y][x]) set.add(`${x},${y}`);
+        return set;
+      }
+      function nearestEdgeDirection(x, y) {
+        const distances = [
+          { dir: [-1, 0], dist: x }, { dir: [1, 0], dist: W - 1 - x },
+          { dir: [0, -1], dist: y }, { dir: [0, 1], dist: D - 1 - y },
+        ].sort((a, b) => a.dist - b.dist);
+        return distances[0].dir;
+      }
+      function carveSlopePath(seedX, seedY, z) {
+        const path = []; let x = seedX, y = seedY, guard = 0, momentum = nearestEdgeDirection(x, y);
+        while (!isEdgeCell(x, y, z) && guard < 100) {
+          guard++;
+          const preferred = nearestEdgeDirection(x, y);
+          if (Math.random() < settings.slopeAmt) momentum = preferred;
+          const side = momentum[0] !== 0 ? [momentum[0], Math.random() < 0.5 ? -1 : 1] : [Math.random() < 0.5 ? -1 : 1, momentum[1]];
+          const candidates = [momentum, preferred, momentum, side, preferred];
+          let moved = false;
+          for (const [dx, dy] of candidates) {
+            const nx = x + dx, ny = y + dy;
+            if (!inBounds(nx, ny, z)) continue;
+            if (grid[z][ny][nx] && canRemove(nx, ny, z)) { path.push({ x: nx, y: ny }); x = nx; y = ny; moved = true; break; }
+            if (!grid[z][ny][nx]) { x = nx; y = ny; moved = true; break; }
+          }
+          if (!moved) break;
+        }
+        return path;
+      }
+      function growCluster(z, targetRemovals) {
+        const sx = Math.floor(Math.random() * W), sy = Math.floor(Math.random() * D);
+        const frontier = [{ x: sx, y: sy, w: 2 }];
+        const seen = new Set([`${sx},${sy}`]);
+        let removed = 0;
+        while (frontier.length && removed < targetRemovals) {
+          frontier.sort((a, b) => b.w - a.w);
+          const pickIndex = Math.floor(Math.random() * Math.min(frontier.length, Math.max(1, Math.round(4 - settings.clusterAmt * 3))));
+          const current = frontier.splice(pickIndex, 1)[0];
+          if (grid[z][current.y][current.x] && canRemove(current.x, current.y, z)) { grid[z][current.y][current.x] = false; removed++; }
+          const dirs = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+          for (const [dx, dy] of dirs) {
+            const nx = current.x + dx, ny = current.y + dy, key = `${nx},${ny}`;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= D || seen.has(key)) continue;
+            seen.add(key);
+            let weight = 1;
+            for (const [adx, ady] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+              const ax = nx + adx, ay = ny + ady;
+              if (ax >= 0 && ax < W && ay >= 0 && ay < D && !grid[z][ay][ax]) weight += 1.5;
+            }
+            if (nx === 0 || nx === W - 1 || ny === 0 || ny === D - 1) weight *= 2;
+            frontier.push({ x: nx, y: ny, w: weight });
+          }
+        }
+      }
+      function connectMissingToEdge(z) {
+        const missing = carvedSetForLayer(z); if (!missing.size) return;
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]]; const seen = new Set(); const components = [];
+        for (const key of missing) {
+          if (seen.has(key)) continue;
+          const [sx, sy] = key.split(',').map(Number);
+          const comp = []; const q = [{ x: sx, y: sy }]; seen.add(key);
+          while (q.length) {
+            const cur = q.shift(); comp.push(cur);
+            for (const [dx, dy] of dirs) {
+              const nx = cur.x + dx, ny = cur.y + dy, nk = `${nx},${ny}`;
+              if (nx < 0 || nx >= W || ny < 0 || ny >= D || !missing.has(nk) || seen.has(nk)) continue;
+              seen.add(nk); q.push({ x: nx, y: ny });
+            }
+          }
+          components.push(comp);
+        }
+        for (const comp of components) {
+          if (comp.some(c => isEdgeCell(c.x, c.y, z))) continue;
+          const start = comp[Math.floor(Math.random() * comp.length)];
+          const path = carveSlopePath(start.x, start.y, z);
+          for (const step of path) if (grid[z][step.y][step.x] && canRemove(step.x, step.y, z)) grid[z][step.y][step.x] = false;
+        }
+      }
+      function encourageSlopes() {
+        for (let z = H - 1; z >= 1; z--) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (!grid[z][y][x]) {
+          const options = [[1,0],[-1,0],[0,1],[0,-1]].sort(() => Math.random() - 0.5);
+          for (const [dx, dy] of options) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= W || ny < 0 || ny >= D) continue;
+            if (grid[z - 1][ny][nx] && Math.random() < settings.slopeAmt && canRemove(nx, ny, z - 1)) { grid[z - 1][ny][nx] = false; break; }
+          }
+        }
+      }
+      function carveTerraces() {
+        const passes = 1 + Math.floor(settings.terraceAmt * 3);
+        for (let pass = 0; pass < passes; pass++) {
+          for (let z = H - 1; z >= 1; z--) {
+            const yFirst = Math.random() < 0.5, yDir = Math.random() < 0.5 ? 1 : -1, xDir = Math.random() < 0.5 ? 1 : -1;
+            const ys = Array.from({ length: D }, (_, i) => yDir > 0 ? i : D - 1 - i);
+            const xs = Array.from({ length: W }, (_, i) => xDir > 0 ? i : W - 1 - i);
+            const outer = yFirst ? ys : xs, inner = yFirst ? xs : ys;
+            for (const a of outer) {
+              let terraceStarted = false;
+              for (const b of inner) {
+                const x = yFirst ? b : a, y = yFirst ? a : b;
+                if (!grid[z][y][x]) continue;
+                const exposedSides = (!isOccupied(x + 1, y, z) ? 1 : 0) + (!isOccupied(x - 1, y, z) ? 1 : 0) + (!isOccupied(x, y + 1, z) ? 1 : 0) + (!isOccupied(x, y - 1, z) ? 1 : 0);
+                const shouldCarve = exposedSides >= 2 && Math.random() < settings.terraceAmt;
+                if (!terraceStarted && shouldCarve && canRemove(x, y, z)) { grid[z][y][x] = false; terraceStarted = true; continue; }
+                if (terraceStarted && Math.random() < settings.terraceAmt * 0.72 && canRemove(x, y, z)) grid[z][y][x] = false;
+                else if (terraceStarted) terraceStarted = false;
+              }
+            }
+          }
+        }
+      }
+      function carveCornerNotches() {
+        const corners = shuffle([{ x: 0, y: 0 }, { x: W - 1, y: 0 }, { x: 0, y: D - 1 }, { x: W - 1, y: D - 1 }]);
+        for (const corner of corners) {
+          if (Math.random() > settings.notchAmt) continue;
+          const depthSteps = 1 + Math.floor(Math.random() * Math.max(1, Math.round(settings.notchAmt * 3)));
+          const heightStart = 1 + Math.floor(Math.random() * Math.max(1, H - 1));
+          const dx = corner.x === 0 ? 1 : -1, dy = corner.y === 0 ? 1 : -1;
+          for (let step = 0; step < depthSteps; step++) {
+            const cells = [
+              { x: corner.x + dx * step, y: corner.y },
+              { x: corner.x, y: corner.y + dy * step },
+              { x: corner.x + dx * step, y: corner.y + dy * step },
+            ];
+            for (const cell of cells) {
+              if (!inBounds(cell.x, cell.y, 0)) continue;
+              for (let z = H - 1; z >= heightStart; z--) if (grid[z][cell.y][cell.x] && canRemove(cell.x, cell.y, z)) grid[z][cell.y][cell.x] = false;
+            }
+          }
+        }
+      }
+      function addPillarsAndBridges() {
+        const candidates = [];
+        for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
+          let top = -1;
+          for (let z = H - 1; z >= 0; z--) if (grid[z][y][x]) { top = z; break; }
+          if (top < 0 || top >= H - 1) continue;
+          const edgeish = x === 0 || x === W - 1 || y === 0 || y === D - 1;
+          const exposedSides = (!isOccupied(x + 1, y, top) ? 1 : 0) + (!isOccupied(x - 1, y, top) ? 1 : 0) + (!isOccupied(x, y + 1, top) ? 1 : 0) + (!isOccupied(x, y - 1, top) ? 1 : 0);
+          if (edgeish || exposedSides >= 2) candidates.push({ x, y, z: top });
+        }
+        const shuffled = shuffle(candidates);
+        const addCount = Math.min(shuffled.length, Math.floor(1 + settings.pillarAmt * 4));
+        for (let i = 0; i < addCount; i++) if (Math.random() <= settings.pillarAmt) { const cell = shuffled[i]; if (cell.z + 1 < H) setOccupied(cell.x, cell.y, cell.z + 1, true); }
+        if (Math.random() < settings.bridgeAmt) {
+          const topCells = [];
+          for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) for (let z = H - 1; z >= 1; z--) if (grid[z][y][x]) { topCells.push({ x, y, z }); break; }
+          const ordered = shuffle(topCells);
+          for (const cell of ordered) {
+            const dirs = shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+            let bridged = false;
+            for (const [dx, dy] of dirs) {
+              const mx = cell.x + dx, my = cell.y + dy, tx = cell.x + dx * 2, ty = cell.y + dy * 2;
+              if (!inBounds(mx, my, cell.z) || !inBounds(tx, ty, cell.z) || grid[cell.z][my][mx]) continue;
+              if (grid[cell.z][ty][tx] && grid[cell.z - 1][my][mx]) { setOccupied(mx, my, cell.z, true); bridged = true; break; }
+            }
+            if (bridged) break;
+          }
+        }
+      }
+      function cleanupThinSpots() {
+        for (let pass = 0; pass < 4; pass++) for (let z = H - 1; z >= 0; z--) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (grid[z][y][x] && countNeighbors(x, y, z) <= 1 && canRemove(x, y, z)) grid[z][y][x] = false;
+      }
+      function ensureInterestingMass() {
+        const count = occupiedCount();
+        if (count < 14) {
+          const refill = shuffle(allOccupiedCoords()).slice(0, 4);
+          for (const cube of refill) if (cube.z + 1 < H) setOccupied(cube.x, cube.y, cube.z + 1, true);
+        }
+        if (!hasSpanAcrossX() && !hasSpanAcrossY()) {
+          const y = Math.floor(Math.random() * D);
+          for (let x = 0; x < W; x++) setOccupied(x, y, 0, true);
+        }
+      }
+      for (let z = 0; z < H; z++) {
+        const topFactor = H === 1 ? 1 : z / (H - 1);
+        const removalShare = (1 - settings.topBias) + settings.topBias * topFactor;
+        const targetRemovals = Math.max(2, Math.min(W * D - 2, Math.round(W * D * settings.removeAmt * (0.3 + removalShare))));
+        growCluster(z, targetRemovals);
+        connectMissingToEdge(z);
+      }
+      carveTerraces(); carveCornerNotches(); encourageSlopes(); addPillarsAndBridges(); cleanupThinSpots(); ensureInterestingMass();
+      const occupied = [];
+      for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (grid[z][y][x]) occupied.push({ x, y, z });
+      return occupied;
+    }
+
+    function simplifyShape(occupiedData) {
+      const heights = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (const c of occupiedData) if (c.z > heights[c.y][c.x]) heights[c.y][c.x] = c.z;
+      const simple = [];
+      for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
+        const h = heights[y][x];
+        if (h < 0) continue;
+        for (let z = 0; z <= h; z++) simple.push({ x, y, z });
+      }
+      return simple;
+    }
+
+    function buildMaps(occupiedData) {
+      const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+      const topMap = Array.from({ length: D }, () => Array(W).fill(-1));
+      for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) for (let z = H - 1; z >= 0; z--) if (occupiedSet.has(`${x},${y},${z}`)) { topMap[y][x] = z; break; }
+      const frontMap = Array.from({ length: H }, () => Array(D).fill(null));
+      for (let z = 0; z < H; z++) for (let y = 0; y < D; y++) for (let x = W - 1; x >= 0; x--) if (occupiedSet.has(`${x},${y},${z}`)) { frontMap[z][y] = x; break; }
+      const leftMap = Array.from({ length: H }, () => Array(W).fill(null));
+      for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) for (let y = D - 1; y >= 0; y--) if (occupiedSet.has(`${x},${y},${z}`)) { leftMap[z][x] = y; break; }
+      return { topMap, frontMap, leftMap, occupiedSet };
+    }
+
+    function transformProjectionMap(sourceMap, mode) {
+      const rotateMapCW = map => {
+        const oldRows = map.length, oldCols = map[0].length;
+        return Array.from({ length: oldCols }, (_, r) => Array.from({ length: oldRows }, (_, c) => map[oldRows - 1 - c][r]));
+      };
+      return mode === 'front' ? sourceMap.map(row => [...row].reverse()) : mode === 'top' ? rotateMapCW(sourceMap) : sourceMap;
+    }
+
+    function drawMapProjection(canvasEl, map, mode) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvasEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      canvasEl.width = Math.floor(rect.width * ratio);
+      canvasEl.height = Math.floor(rect.height * ratio);
+      const ctx = canvasEl.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const rows = map.length, cols = map[0].length, pad = 8;
+      const cell = Math.max(8, Math.min((rect.width - pad * 2) / cols, (rect.height - pad * 2) / rows));
+      const drawW = cols * cell, drawH = rows * cell;
+      const ox = (rect.width - drawW) / 2, oy = (rect.height - drawH) / 2;
+      const stroke = 'rgba(20,20,20,0.98)', fill = 'rgb(248,248,248)';
+      function valueAt(r, c) { if (r < 0 || c < 0 || r >= rows || c >= cols) return null; return map[r][c]; }
+      function projectCell(r, c) { return mode === 'top' ? { px: ox + c * cell, py: oy + r * cell } : { px: ox + c * cell, py: oy + (rows - 1 - r) * cell }; }
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const val = map[r][c]; if (val === null || val === -1) continue;
+        const { px, py } = projectCell(r, c);
+        ctx.fillStyle = fill; ctx.fillRect(px, py, cell, cell);
+      }
+      ctx.beginPath(); ctx.strokeStyle = stroke; ctx.lineWidth = 1.6;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const val = map[r][c]; if (val === null || val === -1) continue;
+        const { px, py } = projectCell(r, c);
+        const left = valueAt(r, c - 1), right = valueAt(r, c + 1), up = mode === 'top' ? valueAt(r - 1, c) : valueAt(r + 1, c), down = mode === 'top' ? valueAt(r + 1, c) : valueAt(r - 1, c);
+        if (left === null || left === -1 || left !== val) { ctx.moveTo(px, py); ctx.lineTo(px, py + cell); }
+        if (right === null || right === -1 || right !== val) { ctx.moveTo(px + cell, py); ctx.lineTo(px + cell, py + cell); }
+        if (up === null || up === -1 || up !== val) { ctx.moveTo(px, py); ctx.lineTo(px + cell, py); }
+        if (down === null || down === -1 || down !== val) { ctx.moveTo(px, py + cell); ctx.lineTo(px + cell, py + cell); }
+      }
+      ctx.stroke();
+    }
+
+    function getBounds3D(occupiedData) {
+      if (!occupiedData.length) return { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
+      const xs = occupiedData.map(c => c.x), ys = occupiedData.map(c => c.y), zs = occupiedData.map(c => c.z);
+      return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys), minZ: Math.min(...zs), maxZ: Math.max(...zs) };
+    }
+
+    function normalizeOccupied(occupiedData) {
+      const bounds = getBounds3D(occupiedData);
+      return occupiedData.map(c => ({ x: c.x - bounds.minX, y: c.y - bounds.minY, z: c.z - bounds.minZ })).sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
+    }
+
+    function makeSignature(occupiedData) {
+      return normalizeOccupied(occupiedData).map(c => `${c.x},${c.y},${c.z}`).sort().join('|');
+    }
+
+    function generateTarget() {
+      return simplifyShape(buildAssembly(makeRandomSettings(PRESET)));
+    }
+
+    function buildHeightMap(occupiedData) {
+      const map = Array.from({ length: D }, () => Array(W).fill(0));
+      for (const cube of occupiedData) map[cube.y][cube.x] = Math.max(map[cube.y][cube.x], cube.z + 1);
+      return map;
+    }
+
+    function countDiffCells() {
+      const targetSet = new Set(state.target.map(c => `${c.x},${c.y},${c.z}`));
+      const buildSet = new Set(state.build.map(c => `${c.x},${c.y},${c.z}`));
+      let missing = 0, extra = 0;
+      for (const key of targetSet) if (!buildSet.has(key)) missing += 1;
+      for (const key of buildSet) if (!targetSet.has(key)) extra += 1;
+      return { missing, extra };
+    }
+
+    function resetReviewMode() {
+      state.revealMode = false;
+    }
+
+    function getCubeAt(x, y, z) {
+      return state.build.find(c => c.x === x && c.y === y && c.z === z);
+    }
+
+    function hasSupport(x, y, z) {
+      return z === 0 || !!getCubeAt(x, y, z - 1);
+    }
+
+    function toggleCube(x, y, z) {
+      resetReviewMode();
+      const existing = getCubeAt(x, y, z);
+      if (existing) {
+        const above = getCubeAt(x, y, z + 1);
+        if (above) { setMessage('Remove upper cubes first before deleting support underneath.', 'warn'); return; }
+        state.build = state.build.filter(c => !(c.x === x && c.y === y && c.z === z));
+        setMessage(`Removed cube at column ${x + 1}, row ${y + 1}, layer ${z + 1}.`, '');
+      } else {
+        if (!hasSupport(x, y, z)) { setMessage('That cube would float. Build support underneath first.', 'warn'); return; }
+        state.build.push({ x, y, z });
+        setMessage(`Added cube at column ${x + 1}, row ${y + 1}, layer ${z + 1}.`, '');
+      }
+      renderAll();
+    }
+
+    function clearLayer(z) {
+      resetReviewMode();
+      state.build = state.build.filter(c => c.z !== z);
+      renderAll();
+      setMessage(`Cleared layer ${z + 1}.`, '');
+    }
+
+    function clearAll() {
+      resetReviewMode();
+      state.build = [];
+      renderAll();
+      setMessage('Build cleared. Start again from layer 1.', '');
+    }
+
+    function revealAnswer() {
+      state.revealMode = true;
+      const diff = countDiffCells();
+      renderAll();
+      if (diff.missing === 0 && diff.extra === 0) {
+        setMessage('Your build already matches the answer. The review colours are showing the target layer-by-layer.', 'good');
+      } else {
+        setMessage(`Review mode: compare your build to the target. Yellow = missing cubes, red = extra cubes. Missing: ${diff.missing}, extra: ${diff.extra}.`, 'warn');
+      }
+    }
+
+    function checkBuild() {
+      state.checks += 1;
+      const targetSig = makeSignature(state.target);
+      const buildSig = makeSignature(state.build);
+      if (buildSig === targetSig) {
+        state.solved += 1;
+        renderAll();
+        setMessage('Perfect match. You rebuilt the hidden block.', 'good');
+        return;
+      }
+      const targetHeights = buildHeightMap(state.target);
+      const buildHeights = buildHeightMap(state.build);
+      let mismatchCount = 0;
+      for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) if (targetHeights[y][x] !== buildHeights[y][x]) mismatchCount += 1;
+      renderAll();
+      const diff = countDiffCells();
+      setMessage(`Not quite yet. ${mismatchCount} footprint cells still have the wrong height. Missing cubes: ${diff.missing}. Extra cubes: ${diff.extra}.`, 'bad');
+    }
+
+    function newChallenge() {
+      state.target = generateTarget();
+      state.build = [];
+      state.revealMode = false;
+      state.checks = 0;
+      state.selectedLayer = 0;
+      state.challenge += 1;
+      renderAll();
+      setMessage('New challenge loaded. Start by matching the top view footprint on layer 1.', '');
+    }
+
+    function renderLayers() {
+      els.layerRow.innerHTML = '';
+      for (let z = 0; z < H; z++) {
+        const btn = document.createElement('button');
+        btn.className = `layerBtn${state.selectedLayer === z ? ' active' : ''}`;
+        btn.type = 'button';
+        btn.textContent = `L${z + 1}`;
+        btn.addEventListener('click', () => { state.selectedLayer = z; renderAll(); });
+        els.layerRow.appendChild(btn);
+      }
+    }
+
+    function renderGrid() {
+      els.gridWrap.innerHTML = '';
+      const heightMap = buildHeightMap(state.build);
+      const targetSet = new Set(state.target.map(c => `${c.x},${c.y},${c.z}`));
+      const buildSet = new Set(state.build.map(c => `${c.x},${c.y},${c.z}`));
+      for (let y = 0; y < D; y++) {
+        for (let x = 0; x < W; x++) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          const hasCurrent = buildSet.has(`${x},${y},${state.selectedLayer}`);
+          const targetCurrent = targetSet.has(`${x},${y},${state.selectedLayer}`);
+          const height = heightMap[y][x];
+          let extraClass = hasCurrent ? ' active topCube' : height > 0 ? ' supportOnly' : '';
+          if (state.revealMode) {
+            if (hasCurrent && targetCurrent) extraClass = ' diffCorrect';
+            else if (!hasCurrent && targetCurrent) extraClass = ' diffMissing';
+            else if (hasCurrent && !targetCurrent) extraClass = ' diffExtra';
+          }
+          btn.className = `cellBtn${extraClass}`;
+          btn.innerHTML = hasCurrent ? '■' : height > 0 ? String(height) : '';
+          if (state.revealMode && !hasCurrent && targetCurrent) btn.innerHTML = '+';
+          if (state.revealMode && hasCurrent && !targetCurrent) btn.innerHTML = '×';
+          btn.title = `Column ${x + 1}, Row ${y + 1}`;
+          btn.addEventListener('click', () => toggleCube(x, y, state.selectedLayer));
+          els.gridWrap.appendChild(btn);
+        }
+      }
+    }
+
+    function renderViews() {
+      const maps = buildMaps(state.target);
+      drawMapProjection(els.frontCanvas, transformProjectionMap(maps.frontMap, 'front'), 'front');
+      drawMapProjection(els.leftCanvas, transformProjectionMap(maps.leftMap, 'left'), 'left');
+      drawMapProjection(els.topCanvas, transformProjectionMap(maps.topMap, 'top'), 'top');
+    }
+
+    function renderStats() {
+      els.challengeNum.textContent = String(Math.max(1, state.challenge - 1));
+      els.checkCount.textContent = String(state.checks);
+      els.cubeCount.textContent = String(state.build.length);
+      els.layerDisplay.textContent = String(state.selectedLayer + 1);
+      els.focusStatus.textContent = state.revealMode ? `Reviewing layer ${state.selectedLayer + 1}` : `Layer ${state.selectedLayer + 1}`;
+      els.targetCount.textContent = String(state.target.length);
+      els.solvedCount.textContent = String(state.solved);
+    }
+
+    function renderAll() {
+      renderViews();
+      renderLayers();
+      renderGrid();
+      renderIsoCanvas(els.buildPreview, state.revealMode ? state.target : state.build);
+      renderStats();
+    }
+
+    els.checkBtn.addEventListener('click', checkBuild);
+    els.newBtn.addEventListener('click', newChallenge);
+    els.clearLayerBtn.addEventListener('click', () => clearLayer(state.selectedLayer));
+    els.clearAllBtn.addEventListener('click', clearAll);
+    els.revealBtn.addEventListener('click', revealAnswer);
+    window.addEventListener('resize', renderAll);
+
+    state.target = generateTarget();
+    renderAll();
+  </script>
+</body>
+</html>

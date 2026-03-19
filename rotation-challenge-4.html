@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rotation Challenge</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #eef2f7;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --text: #152033;
+      --muted: #5f6b7a;
+      --line: #cad5e2;
+      --accent: #1d4ed8;
+      --accent-soft: #dbeafe;
+      --good: #166534;
+      --good-soft: #dcfce7;
+      --bad: #b91c1c;
+      --bad-soft: #fee2e2;
+      --warn: #92400e;
+      --warn-soft: #fef3c7;
+      --shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+      --radius: 20px;
+    }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: linear-gradient(180deg, #f5f7fb 0%, #e9eef6 100%);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+    }
+    body { padding: 18px; }
+    .app { width: min(1480px, calc(100vw - 24px)); margin: 0 auto; display: grid; gap: 16px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .topbar { padding: 14px 18px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 18px; align-items: center; }
+    .titleWrap h1 { margin: 0; font-size: clamp(24px, 2.8vw, 36px); line-height: 1.04; }
+    .titleWrap p { margin: 6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.4; }
+    .topStats { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+    .stat { min-width: 118px; padding: 10px 12px; border-radius: 16px; background: var(--panel-2); border: 1px solid var(--line); }
+    .statLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; font-weight: 700; }
+    .statValue { font-size: 22px; font-weight: 800; line-height: 1; }
+    .setup { padding: 18px; display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; }
+    .setupCard { border: 1px solid var(--line); border-radius: 18px; background: var(--panel-2); padding: 16px; }
+    .setupCard h2 { margin: 0 0 10px; font-size: 20px; }
+    .setupCard p, .setupCard li { color: var(--muted); line-height: 1.45; font-size: 14px; }
+    .formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+    label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+    input, button { font: inherit; }
+    input { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 12px 13px; background: #fff; color: var(--text); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button { border: 1px solid transparent; border-radius: 14px; padding: 12px 16px; cursor: pointer; font-weight: 700; transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease; }
+    button:hover:not(:disabled) { transform: translateY(-1px); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    .primaryBtn { background: var(--accent); color: #fff; }
+    .ghostBtn { background: #fff; color: var(--text); border-color: var(--line); }
+    .game { display: none; grid-template-columns: 0.82fr 1.18fr; gap: 16px; align-items: start; }
+    .game.active { display: grid; }
+    .sidebar, .board { padding: 16px; }
+    .subtleTitle { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 800; margin-bottom: 10px; }
+    .focusCard, .helperCard { border: 1px solid var(--line); border-radius: 20px; background: var(--panel-2); padding: 14px; }
+    .focusCard { margin-bottom: 14px; }
+    .focusHeader { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .focusHeader h2, .boardHeader h2 { margin: 0; }
+    .focusStatus { font-size: 12px; font-weight: 800; padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+    .sourceCanvas { width: 100%; height: 300px; display: block; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+    .helperCard p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .boardHeader { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 14px; }
+    .selectionInfo { color: var(--muted); font-size: 14px; }
+    .optionGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .optionCard { position: relative; border: 2px solid var(--line); border-radius: 18px; background: #fff; padding: 12px; min-height: 250px; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease; }
+    .optionCard:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08); }
+    .optionCard.correct { border-color: #16a34a; background: var(--good-soft); }
+    .optionCard.wrong { border-color: #ef4444; background: var(--bad-soft); }
+    .optionCard.locked { pointer-events: none; }
+    .optionCard canvas { width: 100%; height: 165px; display: block; background: #fff; border-radius: 12px; }
+    .optionCardHeader { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .optionNum { font-size: 14px; font-weight: 800; }
+    .optionTag { font-size: 11px; font-weight: 800; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .optionFoot { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .controlRow { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-top: 16px; align-items: center; }
+    .messageBar { min-height: 46px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-size: 14px; display: flex; align-items: center; flex: 1; line-height: 1.4; }
+    .messageBar.good { border-color: #86efac; background: var(--good-soft); color: var(--good); }
+    .messageBar.bad { border-color: #fca5a5; background: var(--bad-soft); color: var(--bad); }
+    .messageBar.warn { border-color: #fcd34d; background: var(--warn-soft); color: var(--warn); }
+    .hidden { display: none !important; }
+    @media (max-width: 1150px) { .setup, .game { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { body { padding: 10px; } .app { width: 100%; } .formGrid, .optionGrid { grid-template-columns: 1fr; } .topStats { width: 100%; justify-content: stretch; } .stat { flex: 1 1 calc(50% - 10px); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="panel topbar">
+      <div class="titleWrap">
+        <h1>Rotation Challenge</h1>
+        <p>Study the source block, then choose the shape that matches it after a 90 degree clockwise rotation around the vertical axis.</p>
+      </div>
+      <div class="topStats">
+        <div class="stat"><div class="statLabel">Student</div><div class="statValue" id="studentDisplay">—</div></div>
+        <div class="stat"><div class="statLabel">Class</div><div class="statValue" id="classDisplay">—</div></div>
+        <div class="stat"><div class="statLabel">Progress</div><div class="statValue" id="scoreDisplay">0 / 8</div></div>
+      </div>
+    </section>
+
+    <section class="panel setup" id="setupScreen">
+      <div class="setupCard">
+        <h2>Set up the round</h2>
+        <p>Players see one source block and must mentally rotate it. Distractors include one almost-correct rotated version plus other wrong turns.</p>
+        <div class="formGrid">
+          <label>Student name<input id="studentName" type="text" placeholder="e.g. Ava Ngata" /></label>
+          <label>Class<input id="studentClass" type="text" placeholder="e.g. Tech 10" /></label>
+        </div>
+        <div class="actions">
+          <button class="primaryBtn" id="startBtn" type="button">Start round</button>
+          <button class="ghostBtn" id="demoBtn" type="button">Fill demo details</button>
+        </div>
+      </div>
+      <div class="setupCard">
+        <h2>How it plays</h2>
+        <ul>
+          <li>Look at the source shape carefully.</li>
+          <li>Mental task: rotate it 90 degrees clockwise around the vertical axis.</li>
+          <li>Pick the matching option from the answer bank.</li>
+        </ul>
+        <p><strong>Tip:</strong> watch where the tallest stacks move after rotation. Front corners become side corners.</p>
+      </div>
+    </section>
+
+    <section class="game" id="gameScreen">
+      <aside class="panel sidebar">
+        <div class="subtleTitle">Source block</div>
+        <div class="focusCard">
+          <div class="focusHeader">
+            <h2 id="focusTitle">Question 1 of 8</h2>
+            <div class="focusStatus">Rotate 90 degree clockwise</div>
+          </div>
+          <canvas class="sourceCanvas" id="sourceCanvas"></canvas>
+        </div>
+        <div class="helperCard">
+          <p><strong>Rotation rule:</strong> imagine looking from above. Every footprint square turns one quarter-turn clockwise.</p>
+          <p><strong>Watch for traps:</strong> two options can both look rotated. One is the true 90 degree clockwise turn, and one is a slightly wrong near-match.</p>
+        </div>
+      </aside>
+
+      <section class="panel board">
+        <div class="boardHeader">
+          <div>
+            <h2>Choose the rotated result</h2>
+            <div class="selectionInfo">Select the option that matches the source after rotation.</div>
+          </div>
+          <div class="topStats">
+            <div class="stat"><div class="statLabel">Correct</div><div class="statValue" id="correctDisplay">0</div></div>
+            <div class="stat"><div class="statLabel">Wrong</div><div class="statValue" id="wrongDisplay">0</div></div>
+          </div>
+        </div>
+        <div class="optionGrid" id="optionGrid"></div>
+        <div class="controlRow">
+          <div class="messageBar" id="messageBar">Enter details and start the round.</div>
+          <div class="actions" style="margin-top:0;">
+            <button class="ghostBtn" id="skipBtn" type="button">New question</button>
+            <button class="ghostBtn" id="resetBtn" type="button">Back to setup</button>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+<script>
+const W = 4, D = 6, H = 4;
+const OPTION_SIDE = Math.max(W, D);
+const TILE_W = 32, TILE_H = 16, CUBE_H = 20;
+const PRESET = { topBias: 0.4, removeAmt: 0.6, clusterAmt: 0.5, slopeAmt: 1, terraceAmt: 0.55, notchAmt: 0.52, pillarAmt: 0.36, bridgeAmt: 0.3 };
+const state = { running:false, correct:0, wrong:0, solved:0, sheetSize:8, current:null, lock:false, player:{name:'', className:''} };
+const els = {
+  setupScreen: document.getElementById('setupScreen'), gameScreen: document.getElementById('gameScreen'),
+  studentName: document.getElementById('studentName'), studentClass: document.getElementById('studentClass'),
+  studentDisplay: document.getElementById('studentDisplay'), classDisplay: document.getElementById('classDisplay'),
+  scoreDisplay: document.getElementById('scoreDisplay'), correctDisplay: document.getElementById('correctDisplay'), wrongDisplay: document.getElementById('wrongDisplay'),
+  sourceCanvas: document.getElementById('sourceCanvas'), optionGrid: document.getElementById('optionGrid'), messageBar: document.getElementById('messageBar'), focusTitle: document.getElementById('focusTitle')
+};
+function randBetween(min, max) { return min + Math.random() * (max - min); }
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function makeRandomSettings(base = PRESET) {
+  return {
+    topBias: clamp(base.topBias + randBetween(-0.28, 0.34), 0.08, 0.92),
+    removeAmt: clamp(base.removeAmt + randBetween(-0.18, 0.2), 0.34, 0.82),
+    clusterAmt: clamp(base.clusterAmt + randBetween(-0.28, 0.28), 0.14, 0.92),
+    slopeAmt: clamp(base.slopeAmt + randBetween(-0.48, 0.18), 0.28, 1.2),
+    terraceAmt: clamp((base.terraceAmt ?? 0.55) + randBetween(-0.28, 0.28), 0.08, 0.95),
+    notchAmt: clamp((base.notchAmt ?? 0.52) + randBetween(-0.28, 0.28), 0.1, 0.95),
+    pillarAmt: clamp((base.pillarAmt ?? 0.36) + randBetween(-0.2, 0.32), 0.05, 0.9),
+    bridgeAmt: clamp((base.bridgeAmt ?? 0.3) + randBetween(-0.16, 0.28), 0.02, 0.86),
+  };
+}
+function shuffle(array) { const arr=[...array]; for (let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
+function iso(x, y, z, originX, originY) { return { x: originX + (x - y) * TILE_W, y: originY + (x + y) * TILE_H - z * CUBE_H }; }
+function computeIsoBounds(occupiedData) {
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const c of occupiedData) {
+    const p=iso(c.x,c.y,c.z,0,0);
+    minX=Math.min(minX,p.x-TILE_W-2); maxX=Math.max(maxX,p.x+TILE_W+2);
+    minY=Math.min(minY,p.y-2); maxY=Math.max(maxY,p.y+TILE_H*2+CUBE_H+2);
+  }
+  if (!occupiedData.length) { minX=minY=0; maxX=maxY=1; }
+  return { minX, maxX, minY, maxY };
+}
+function drawCube(ctx, x, y, z, originX, originY, occupiedSet) {
+  const p = iso(x,y,z,originX,originY);
+  const top='rgb(248,248,248)', left='rgb(232,232,232)', right='rgb(214,214,214)', stroke='rgba(20,20,20,0.96)';
+  const hasTop=occupiedSet.has(`${x},${y},${z+1}`), hasLeftNeighbor=occupiedSet.has(`${x},${y+1},${z}`), hasRightNeighbor=occupiedSet.has(`${x+1},${y},${z}`);
+  const topFrontJoin = occupiedSet.has(`${x},${y-1},${z}`) && !occupiedSet.has(`${x},${y-1},${z+1}`);
+  const topRightJoin = occupiedSet.has(`${x+1},${y},${z}`) && !occupiedSet.has(`${x+1},${y},${z+1}`);
+  const topBackJoin = occupiedSet.has(`${x},${y+1},${z}`) && !occupiedSet.has(`${x},${y+1},${z+1}`);
+  const topLeftJoin = occupiedSet.has(`${x-1},${y},${z}`) && !occupiedSet.has(`${x-1},${y},${z+1}`);
+  const leftTopJoin = occupiedSet.has(`${x},${y},${z+1}`) && !occupiedSet.has(`${x},${y+1},${z+1}`);
+  const leftBottomJoin = z>0 && occupiedSet.has(`${x},${y},${z-1}`) && !occupiedSet.has(`${x},${y+1},${z-1}`);
+  const leftPrevJoin = occupiedSet.has(`${x-1},${y},${z}`) && !occupiedSet.has(`${x-1},${y+1},${z}`);
+  const leftNextJoin = occupiedSet.has(`${x+1},${y},${z}`) && !occupiedSet.has(`${x+1},${y+1},${z}`);
+  const rightTopJoin = occupiedSet.has(`${x},${y},${z+1}`) && !occupiedSet.has(`${x+1},${y},${z+1}`);
+  const rightBottomJoin = z>0 && occupiedSet.has(`${x},${y},${z-1}`) && !occupiedSet.has(`${x+1},${y},${z-1}`);
+  const rightPrevJoin = occupiedSet.has(`${x},${y-1},${z}`) && !occupiedSet.has(`${x+1},${y-1},${z}`);
+  const rightNextJoin = occupiedSet.has(`${x},${y+1},${z}`) && !occupiedSet.has(`${x+1},${y+1},${z}`);
+  if (!hasTop) {
+    const a={x:p.x,y:p.y}, b={x:p.x+TILE_W,y:p.y+TILE_H}, c={x:p.x,y:p.y+TILE_H*2}, d={x:p.x-TILE_W,y:p.y+TILE_H};
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath(); ctx.fillStyle=top; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle=stroke; ctx.lineWidth=1.4;
+    if (!topFrontJoin){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);} if (!topRightJoin){ctx.moveTo(b.x,b.y);ctx.lineTo(c.x,c.y);} if (!topBackJoin){ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);} if (!topLeftJoin){ctx.moveTo(d.x,d.y);ctx.lineTo(a.x,a.y);} ctx.stroke();
+  }
+  if (!hasLeftNeighbor) {
+    const a={x:p.x-TILE_W,y:p.y+TILE_H}, b={x:p.x,y:p.y+TILE_H*2}, c={x:p.x,y:p.y+TILE_H*2+CUBE_H}, d={x:p.x-TILE_W,y:p.y+TILE_H+CUBE_H};
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath(); ctx.fillStyle=left; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle=stroke; ctx.lineWidth=1.4;
+    if (!leftTopJoin){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);} if (!leftNextJoin){ctx.moveTo(b.x,b.y);ctx.lineTo(c.x,c.y);} if (!leftBottomJoin){ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);} if (!leftPrevJoin){ctx.moveTo(d.x,d.y);ctx.lineTo(a.x,a.y);} ctx.stroke();
+  }
+  if (!hasRightNeighbor) {
+    const a={x:p.x+TILE_W,y:p.y+TILE_H}, b={x:p.x,y:p.y+TILE_H*2}, c={x:p.x,y:p.y+TILE_H*2+CUBE_H}, d={x:p.x+TILE_W,y:p.y+TILE_H+CUBE_H};
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath(); ctx.fillStyle=right; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle=stroke; ctx.lineWidth=1.4;
+    if (!rightTopJoin){ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);} if (!rightNextJoin){ctx.moveTo(b.x,b.y);ctx.lineTo(c.x,c.y);} if (!rightBottomJoin){ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);} if (!rightPrevJoin){ctx.moveTo(d.x,d.y);ctx.lineTo(a.x,a.y);} ctx.stroke();
+  }
+}
+function renderIsoCanvas(canvas, occupiedData) {
+  const ratio = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  canvas.width = Math.floor(rect.width * ratio); canvas.height = Math.floor(rect.height * ratio);
+  const ctx = canvas.getContext('2d'); ctx.setTransform(ratio,0,0,ratio,0,0); ctx.clearRect(0,0,rect.width,rect.height);
+  const bounds = computeIsoBounds(occupiedData), availableW=rect.width-22, availableH=rect.height-22, shapeW=bounds.maxX-bounds.minX, shapeH=bounds.maxY-bounds.minY, scale=Math.min(availableW/shapeW, availableH/shapeH, 1.56);
+  ctx.save(); ctx.translate(rect.width/2, rect.height/2); ctx.scale(scale,scale); ctx.translate(-(bounds.minX+shapeW/2), -(bounds.minY+shapeH/2));
+  const occupiedSet = new Set(occupiedData.map(c => `${c.x},${c.y},${c.z}`));
+  const sorted = [...occupiedData].sort((a,b) => (a.x+a.y+a.z*0.01) - (b.x+b.y+b.z*0.01) || a.z - b.z);
+  for (const cube of sorted) drawCube(ctx, cube.x, cube.y, cube.z, 0, 0, occupiedSet);
+  ctx.restore();
+}
+function buildAssembly(settings) {
+  const grid = Array.from({ length: H }, () => Array.from({ length: D }, () => Array.from({ length: W }, () => true)));
+  const inBounds = (x,y,z) => x>=0 && x<W && y>=0 && y<D && z>=0 && z<H;
+  const isOccupied = (x,y,z) => inBounds(x,y,z) && grid[z][y][x];
+  const setOccupied = (x,y,z,v) => { if (inBounds(x,y,z)) grid[z][y][x] = v; };
+  const neighbors = (x,y,z) => [[x-1,y,z],[x+1,y,z],[x,y-1,z],[x,y+1,z],[x,y,z-1],[x,y,z+1]];
+  const countNeighbors = (x,y,z) => neighbors(x,y,z).filter(([nx,ny,nz]) => isOccupied(nx,ny,nz)).length;
+  const footprintCount = () => { let count=0; for(let y=0;y<D;y++) for(let x=0;x<W;x++) for(let z=0;z<H;z++) if (grid[z][y][x]) { count++; break; } return count; };
+  const occupiedCount = () => { let count=0; for(let z=0;z<H;z++) for(let y=0;y<D;y++) for(let x=0;x<W;x++) if(grid[z][y][x]) count++; return count; };
+  const firstOccupied = () => { for(let z=0;z<H;z++) for(let y=0;y<D;y++) for(let x=0;x<W;x++) if(grid[z][y][x]) return [x,y,z]; return null; };
+  const allOccupiedCoords = () => { const out=[]; for(let z=0;z<H;z++) for(let y=0;y<D;y++) for(let x=0;x<W;x++) if(grid[z][y][x]) out.push({x,y,z}); return out; };
+  const hasSpanAcrossX = () => { const left=new Set(), right=new Set(); for(let z=0;z<H;z++) for(let y=0;y<D;y++){ if(grid[z][y][0]) left.add(`${y},${z}`); if(grid[z][y][W-1]) right.add(`${y},${z}`);} return left.size>0 && right.size>0; };
+  const hasSpanAcrossY = () => { const front=new Set(), back=new Set(); for(let z=0;z<H;z++) for(let x=0;x<W;x++){ if(grid[z][0][x]) front.add(`${x},${z}`); if(grid[z][D-1][x]) back.add(`${x},${z}`);} return front.size>0 && back.size>0; };
+  function canRemove(x,y,z) {
+    if (!isOccupied(x,y,z)) return false;
+    grid[z][y][x] = false;
+    let valid = true;
+    const start = firstOccupied();
+    if (!start) { grid[z][y][x] = true; return false; }
+    const seen = new Set([start.join(',')]); const q=[start];
+    while(q.length) { const [cx,cy,cz]=q.shift(); for(const [nx,ny,nz] of neighbors(cx,cy,cz)){ const key=`${nx},${ny},${nz}`; if(!isOccupied(nx,ny,nz)||seen.has(key)) continue; seen.add(key); q.push([nx,ny,nz]); } }
+    for(let zz=0;zz<H&&valid;zz++) for(let yy=0;yy<D&&valid;yy++) for(let xx=0;xx<W&&valid;xx++) if(grid[zz][yy][xx]) { if (zz>0 && !grid[zz-1][yy][xx]) valid=false; if (countNeighbors(xx,yy,zz)<=1) valid=false; if (!seen.has(`${xx},${yy},${zz}`)) valid=false; }
+    if (footprintCount() < 6) valid = false;
+    grid[z][y][x] = true;
+    return valid;
+  }
+  const isEdgeCell = (x,y,z) => x===0||x===W-1||y===0||y===D-1||z===0||z===H-1;
+  const carvedSetForLayer = z => { const s=new Set(); for(let y=0;y<D;y++) for(let x=0;x<W;x++) if(!grid[z][y][x]) s.add(`${x},${y}`); return s; };
+  const nearestEdgeDirection = (x,y) => [{dir:[-1,0],dist:x},{dir:[1,0],dist:W-1-x},{dir:[0,-1],dist:y},{dir:[0,1],dist:D-1-y}].sort((a,b)=>a.dist-b.dist)[0].dir;
+  function carveSlopePath(seedX,seedY,z) {
+    const path=[]; let x=seedX, y=seedY, guard=0, momentum=nearestEdgeDirection(x,y);
+    while(!isEdgeCell(x,y,z) && guard<100) {
+      guard++; const preferred=nearestEdgeDirection(x,y); if (Math.random()<settings.slopeAmt) momentum=preferred;
+      const side = momentum[0]!==0 ? [momentum[0], Math.random()<0.5?-1:1] : [Math.random()<0.5?-1:1, momentum[1]];
+      const candidates=[momentum,preferred,momentum,side,preferred]; let moved=false;
+      for(const [dx,dy] of candidates) { const nx=x+dx, ny=y+dy; if(!inBounds(nx,ny,z)) continue; if(grid[z][ny][nx] && canRemove(nx,ny,z)) { path.push({x:nx,y:ny}); x=nx; y=ny; moved=true; break; } if(!grid[z][ny][nx]) { x=nx; y=ny; moved=true; break; } }
+      if(!moved) break;
+    }
+    return path;
+  }
+  function growCluster(z,targetRemovals) {
+    const sx=Math.floor(Math.random()*W), sy=Math.floor(Math.random()*D), frontier=[{x:sx,y:sy,w:2}], seen=new Set([`${sx},${sy}`]); let removed=0;
+    while(frontier.length && removed<targetRemovals) {
+      frontier.sort((a,b)=>b.w-a.w); const pickIndex=Math.floor(Math.random()*Math.min(frontier.length, Math.max(1, Math.round(4 - settings.clusterAmt*3)))); const current=frontier.splice(pickIndex,1)[0];
+      if (grid[z][current.y][current.x] && canRemove(current.x,current.y,z)) { grid[z][current.y][current.x]=false; removed++; }
+      const dirs=shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+      for(const [dx,dy] of dirs) { const nx=current.x+dx, ny=current.y+dy, key=`${nx},${ny}`; if(nx<0||nx>=W||ny<0||ny>=D||seen.has(key)) continue; seen.add(key); let weight=1; for(const [adx,ady] of [[1,0],[-1,0],[0,1],[0,-1]]) { const ax=nx+adx, ay=ny+ady; if(ax>=0&&ax<W&&ay>=0&&ay<D&&!grid[z][ay][ax]) weight += 1.5; } if(nx===0||nx===W-1||ny===0||ny===D-1) weight*=2; frontier.push({x:nx,y:ny,w:weight}); }
+    }
+  }
+  function connectMissingToEdge(z) {
+    const missing=carvedSetForLayer(z); if(!missing.size) return; const dirs=[[1,0],[-1,0],[0,1],[0,-1]], seen=new Set(), components=[];
+    for(const key of missing) {
+      if(seen.has(key)) continue; const [sx,sy]=key.split(',').map(Number), comp=[], q=[{x:sx,y:sy}]; seen.add(key);
+      while(q.length){ const cur=q.shift(); comp.push(cur); for(const [dx,dy] of dirs){ const nx=cur.x+dx, ny=cur.y+dy, nk=`${nx},${ny}`; if(nx<0||nx>=W||ny<0||ny>=D||!missing.has(nk)||seen.has(nk)) continue; seen.add(nk); q.push({x:nx,y:ny}); } }
+      components.push(comp);
+    }
+    for(const comp of components){ if(comp.some(c=>isEdgeCell(c.x,c.y,z))) continue; const start=comp[Math.floor(Math.random()*comp.length)]; const path=carveSlopePath(start.x,start.y,z); for(const step of path){ if(grid[z][step.y][step.x] && canRemove(step.x,step.y,z)) grid[z][step.y][step.x]=false; } }
+  }
+  function encourageSlopes() { for(let z=H-1; z>=1; z--) for(let y=0; y<D; y++) for(let x=0; x<W; x++) if(!grid[z][y][x]) { const options=shuffle([[1,0],[-1,0],[0,1],[0,-1]]); for(const [dx,dy] of options){ const nx=x+dx, ny=y+dy; if(nx<0||nx>=W||ny<0||ny>=D) continue; if(grid[z-1][ny][nx] && Math.random()<settings.slopeAmt && canRemove(nx,ny,z-1)) { grid[z-1][ny][nx]=false; break; } } } }
+  function carveTerraces() { const passes=1+Math.floor(settings.terraceAmt*3); for(let pass=0; pass<passes; pass++) for(let z=H-1; z>=1; z--){ const yFirst=Math.random()<0.5, yDir=Math.random()<0.5?1:-1, xDir=Math.random()<0.5?1:-1; const ys=Array.from({length:D},(_,i)=>yDir>0?i:D-1-i), xs=Array.from({length:W},(_,i)=>xDir>0?i:W-1-i), outer=yFirst?ys:xs, inner=yFirst?xs:ys; for(const a of outer){ let terraceStarted=false; for(const b of inner){ const x=yFirst?b:a, y=yFirst?a:b; if(!grid[z][y][x]) continue; const exposedSides=(!isOccupied(x+1,y,z)?1:0)+(!isOccupied(x-1,y,z)?1:0)+(!isOccupied(x,y+1,z)?1:0)+(!isOccupied(x,y-1,z)?1:0); const shouldCarve=exposedSides>=2 && Math.random()<settings.terraceAmt; if(!terraceStarted && shouldCarve && canRemove(x,y,z)){ grid[z][y][x]=false; terraceStarted=true; continue; } if(terraceStarted && Math.random()<settings.terraceAmt*0.72 && canRemove(x,y,z)) grid[z][y][x]=false; else if(terraceStarted) terraceStarted=false; } } } }
+  function carveCornerNotches() { const corners=shuffle([{x:0,y:0},{x:W-1,y:0},{x:0,y:D-1},{x:W-1,y:D-1}]); for(const corner of corners){ if(Math.random()>settings.notchAmt) continue; const depthSteps=1+Math.floor(Math.random()*Math.max(1,Math.round(settings.notchAmt*3))), heightStart=1+Math.floor(Math.random()*Math.max(1,H-1)), dx=corner.x===0?1:-1, dy=corner.y===0?1:-1; for(let step=0; step<depthSteps; step++){ const cells=[{x:corner.x+dx*step,y:corner.y},{x:corner.x,y:corner.y+dy*step},{x:corner.x+dx*step,y:corner.y+dy*step}]; for(const cell of cells){ if(!inBounds(cell.x,cell.y,0)) continue; for(let z=H-1; z>=heightStart; z--) if(grid[z][cell.y][cell.x] && canRemove(cell.x,cell.y,z)) grid[z][cell.y][cell.x]=false; } } } }
+  function addPillarsAndBridges() {
+    const candidates=[]; for(let y=0;y<D;y++) for(let x=0;x<W;x++){ let top=-1; for(let z=H-1; z>=0; z--) if(grid[z][y][x]) { top=z; break; } if(top<0||top>=H-1) continue; const edgeish=x===0||x===W-1||y===0||y===D-1; const exposedSides=(!isOccupied(x+1,y,top)?1:0)+(!isOccupied(x-1,y,top)?1:0)+(!isOccupied(x,y+1,top)?1:0)+(!isOccupied(x,y-1,top)?1:0); if(edgeish||exposedSides>=2) candidates.push({x,y,z:top}); }
+    const shuffled=shuffle(candidates), addCount=Math.min(shuffled.length, Math.floor(1+settings.pillarAmt*4));
+    for(let i=0;i<addCount;i++) if(Math.random()<=settings.pillarAmt){ const cell=shuffled[i]; if(cell.z+1<H) setOccupied(cell.x,cell.y,cell.z+1,true); }
+    if(Math.random()<settings.bridgeAmt){ const topCells=[]; for(let y=0;y<D;y++) for(let x=0;x<W;x++) for(let z=H-1; z>=1; z--) if(grid[z][y][x]) { topCells.push({x,y,z}); break; }
+      const ordered=shuffle(topCells); for(const cell of ordered){ const dirs=shuffle([[1,0],[-1,0],[0,1],[0,-1]]); let bridged=false; for(const [dx,dy] of dirs){ const mx=cell.x+dx,my=cell.y+dy,tx=cell.x+dx*2,ty=cell.y+dy*2; if(!inBounds(mx,my,cell.z)||!inBounds(tx,ty,cell.z)||grid[cell.z][my][mx]) continue; if(grid[cell.z][ty][tx] && grid[cell.z-1][my][mx]){ setOccupied(mx,my,cell.z,true); bridged=true; break; } } if(bridged) break; }
+    }
+  }
+  function cleanupThinSpots() { for(let pass=0; pass<4; pass++) for(let z=H-1; z>=0; z--) for(let y=0; y<D; y++) for(let x=0; x<W; x++) if(grid[z][y][x] && countNeighbors(x,y,z)<=1 && canRemove(x,y,z)) grid[z][y][x]=false; }
+  function ensureInterestingMass() { if (occupiedCount()<14) for(const cube of shuffle(allOccupiedCoords()).slice(0,4)) if(cube.z+1<H) setOccupied(cube.x,cube.y,cube.z+1,true); if(!hasSpanAcrossX() && !hasSpanAcrossY()){ const y=Math.floor(Math.random()*D); for(let x=0;x<W;x++) setOccupied(x,y,0,true); } }
+  for(let z=0; z<H; z++) {
+    const topFactor = H===1 ? 1 : z/(H-1);
+    const removalShare = (1-settings.topBias) + settings.topBias*topFactor;
+    const targetRemovals = Math.max(2, Math.min(W*D-2, Math.round(W*D*settings.removeAmt*(0.3+removalShare))));
+    growCluster(z,targetRemovals); connectMissingToEdge(z);
+  }
+  carveTerraces(); carveCornerNotches(); encourageSlopes(); addPillarsAndBridges(); cleanupThinSpots(); ensureInterestingMass();
+  const occupied=[]; for(let z=0; z<H; z++) for(let y=0; y<D; y++) for(let x=0; x<W; x++) if(grid[z][y][x]) occupied.push({x,y,z});
+  return occupied;
+}
+function getBounds3D(occupiedData){ const xs=occupiedData.map(c=>c.x), ys=occupiedData.map(c=>c.y), zs=occupiedData.map(c=>c.z); return {minX:Math.min(...xs),maxX:Math.max(...xs),minY:Math.min(...ys),maxY:Math.max(...ys),minZ:Math.min(...zs),maxZ:Math.max(...zs)}; }
+function normalizeOccupied(occupiedData){ const b=getBounds3D(occupiedData); return occupiedData.map(c=>({x:c.x-b.minX,y:c.y-b.minY,z:c.z-b.minZ})).sort((a,b)=>a.z-b.z||a.y-b.y||a.x-b.x); }
+function makeSignature(occupiedData){ return normalizeOccupied(occupiedData).map(c=>`${c.x},${c.y},${c.z}`).join('|'); }
+function rotate90CWLocal(occupiedData) {
+  const occ=normalizeOccupied(occupiedData); const b=getBounds3D(occ), depth=b.maxY+1;
+  return normalizeOccupied(occ.map(c => ({ x: depth - 1 - c.y, y: c.x, z: c.z })));
+}
+function rotate180Local(occupiedData) { return rotate90CWLocal(rotate90CWLocal(occupiedData)); }
+function rotate270Local(occupiedData) { return rotate90CWLocal(rotate180Local(occupiedData)); }
+function mirrorXLocal(occupiedData) { const occ=normalizeOccupied(occupiedData); const b=getBounds3D(occ), width=b.maxX+1; return normalizeOccupied(occ.map(c=>({x:(width-1)-c.x,y:c.y,z:c.z}))); }
+function mirrorYLocal(occupiedData) { const occ=normalizeOccupied(occupiedData); const b=getBounds3D(occ), depth=b.maxY+1; return normalizeOccupied(occ.map(c=>({x:c.x,y:(depth-1)-c.y,z:c.z}))); }
+function withinGrid(occupiedData){ const b=getBounds3D(normalizeOccupied(occupiedData)); return b.maxX < OPTION_SIDE && b.maxY < OPTION_SIDE && b.maxZ < H; }
+function occupiedSetFromData(occupiedData){ return new Set(normalizeOccupied(occupiedData).map(c => `${c.x},${c.y},${c.z}`)); }
+function validStructure(occupiedData){
+  const norm = normalizeOccupied(occupiedData);
+  if (!norm.length || !withinGrid(norm)) return false;
+  const set = occupiedSetFromData(norm);
+  for (const cube of norm) if (cube.z > 0 && !set.has(`${cube.x},${cube.y},${cube.z-1}`)) return false;
+  const q = [norm[0]];
+  const seen = new Set([`${norm[0].x},${norm[0].y},${norm[0].z}`]);
+  const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+  while (q.length) {
+    const cur = q.shift();
+    for (const [dx,dy,dz] of dirs) {
+      const key = `${cur.x+dx},${cur.y+dy},${cur.z+dz}`;
+      if (!set.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      const [x,y,z] = key.split(',').map(Number);
+      q.push({x,y,z});
+    }
+  }
+  return seen.size === norm.length;
+}
+
+function buildMaps(occupiedData) {
+  const occ = normalizeOccupied(occupiedData);
+  const bounds = getBounds3D(occ);
+  const width = bounds.maxX + 1;
+  const depth = bounds.maxY + 1;
+  const height = bounds.maxZ + 1;
+  const set = occupiedSetFromData(occ);
+
+  const topMap = Array.from({ length: depth }, () => Array(width).fill(-1));
+  for (let y = 0; y < depth; y++) {
+    for (let x = 0; x < width; x++) {
+      for (let z = height - 1; z >= 0; z--) {
+        if (set.has(`${x},${y},${z}`)) {
+          topMap[y][x] = z;
+          break;
+        }
+      }
+    }
+  }
+
+  const frontMap = Array.from({ length: height }, () => Array(depth).fill(null));
+  for (let z = 0; z < height; z++) {
+    for (let y = 0; y < depth; y++) {
+      for (let x = width - 1; x >= 0; x--) {
+        if (set.has(`${x},${y},${z}`)) {
+          frontMap[z][y] = x;
+          break;
+        }
+      }
+    }
+  }
+
+  const leftMap = Array.from({ length: height }, () => Array(width).fill(null));
+  for (let z = 0; z < height; z++) {
+    for (let x = 0; x < width; x++) {
+      for (let y = depth - 1; y >= 0; y--) {
+        if (set.has(`${x},${y},${z}`)) {
+          leftMap[z][x] = y;
+          break;
+        }
+      }
+    }
+  }
+
+  return { topMap, frontMap, leftMap };
+}
+function mapSimilarity(a, b) {
+  const rows = Math.max(a.length, b.length);
+  const cols = Math.max(a[0]?.length || 0, b[0]?.length || 0);
+  let score = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const av = a[r]?.[c] ?? null;
+      const bv = b[r]?.[c] ?? null;
+      if (av === bv) score += 1;
+    }
+  }
+  return score;
+}
+function projectionSimilarity(a, b) {
+  const ma = buildMaps(a);
+  const mb = buildMaps(b);
+  return mapSimilarity(ma.topMap, mb.topMap) + mapSimilarity(ma.frontMap, mb.frontMap) + mapSimilarity(ma.leftMap, mb.leftMap);
+}
+function overlapCount(a, b) {
+  const setB = new Set(normalizeOccupied(b).map(c => `${c.x},${c.y},${c.z}`));
+  let overlap = 0;
+  for (const cube of normalizeOccupied(a)) if (setB.has(`${cube.x},${cube.y},${cube.z}`)) overlap += 1;
+  return overlap;
+}
+function surfaceExposure(occupiedData, cube) {
+  const set = occupiedSetFromData(occupiedData);
+  const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1]];
+  let openFaces = 0;
+  for (const [dx,dy,dz] of dirs) if (!set.has(`${cube.x+dx},${cube.y+dy},${cube.z+dz}`)) openFaces += 1;
+  return openFaces;
+}
+function rankTwinCandidate(candidate, correct, source, styleBonus = 0) {
+  const norm = normalizeOccupied(candidate);
+  const correctProj = projectionSimilarity(correct, norm);
+  const sourceProj = projectionSimilarity(source, norm);
+  const overlap = overlapCount(correct, norm);
+  return {
+    occupied: norm,
+    rank: correctProj * 10 + overlap * 18 + styleBonus - sourceProj
+  };
+}
+function buildNearRotatedTwin(correct, source) {
+  const norm = normalizeOccupied(correct);
+  const correctSig = makeSignature(norm);
+  const sourceSig = makeSignature(source);
+  const targetSet = occupiedSetFromData(norm);
+  const candidates = [];
+
+  function pushCandidate(candidate, styleBonus = 0) {
+    const normCandidate = normalizeOccupied(candidate);
+    const sig = makeSignature(normCandidate);
+    if (sig === correctSig || sig === sourceSig) return;
+    if (!validStructure(normCandidate) || !withinGrid(normCandidate)) return;
+    const correctProj = projectionSimilarity(norm, normCandidate);
+    const sourceProj = projectionSimilarity(source, normCandidate);
+    if (correctProj <= sourceProj) return;
+    candidates.push(rankTwinCandidate(normCandidate, norm, source, styleBonus));
+  }
+
+  const exposedOrder = [...norm].sort((a, b) => {
+    const byExposure = surfaceExposure(norm, b) - surfaceExposure(norm, a);
+    if (byExposure) return byExposure;
+    return b.z - a.z || b.y - a.y || b.x - a.x;
+  });
+
+  for (const cube of exposedOrder) {
+    const removed = norm.filter(c => !(c.x === cube.x && c.y === cube.y && c.z === cube.z));
+    pushCandidate(removed, cube.z > 0 ? 16 : 8);
+  }
+
+  for (let z = 0; z < H; z++) {
+    for (let y = 0; y < OPTION_SIDE; y++) {
+      for (let x = 0; x < OPTION_SIDE; x++) {
+        const key = `${x},${y},${z}`;
+        if (targetSet.has(key)) continue;
+        if (z > 0 && !targetSet.has(`${x},${y},${z-1}`)) continue;
+        const touching = targetSet.has(`${x+1},${y},${z}`) || targetSet.has(`${x-1},${y},${z}`) || targetSet.has(`${x},${y+1},${z}`) || targetSet.has(`${x},${y-1},${z}`) || targetSet.has(`${x},${y},${z-1}`);
+        if (!touching) continue;
+        pushCandidate([...norm, { x, y, z }], z > 0 ? 18 : 10);
+      }
+    }
+  }
+
+  const dirs = shuffle([[1,0],[-1,0],[0,1],[0,-1]]);
+  for (const cube of exposedOrder.slice(0, 10)) {
+    const removed = norm.filter(c => !(c.x === cube.x && c.y === cube.y && c.z === cube.z));
+    const removedSet = occupiedSetFromData(removed);
+    for (const [dx, dy] of dirs) {
+      const nx = cube.x + dx;
+      const ny = cube.y + dy;
+      const nz = cube.z;
+      if (nx < 0 || nx >= OPTION_SIDE || ny < 0 || ny >= OPTION_SIDE) continue;
+      if (removedSet.has(`${nx},${ny},${nz}`)) continue;
+      if (nz > 0 && !removedSet.has(`${nx},${ny},${nz-1}`)) continue;
+      const moved = [...removed, { x: nx, y: ny, z: nz }];
+      pushCandidate(moved, 22);
+    }
+  }
+
+  candidates.sort((a, b) => b.rank - a.rank || b.occupied.length - a.occupied.length);
+  return candidates[0]?.occupied || null;
+}
+function buildDistinctBlock() {
+  let best = null;
+  for (let guard = 0; guard < 900; guard++) {
+    const raw = normalizeOccupied(buildAssembly(makeRandomSettings(PRESET)));
+    const sig = makeSignature(raw);
+    const r90 = rotate90CWLocal(raw);
+    const r180 = rotate180Local(raw);
+    const r270 = rotate270Local(raw);
+    if (sig === makeSignature(r90) || sig === makeSignature(r180) || sig === makeSignature(r270)) continue;
+
+    const twin = buildNearRotatedTwin(r90, raw);
+    if (!twin) continue;
+
+    const rotationGap = 80 - projectionSimilarity(raw, r90);
+    const twinCloseness = projectionSimilarity(r90, twin);
+    const bounds = getBounds3D(raw);
+    const width = bounds.maxX + 1;
+    const depth = bounds.maxY + 1;
+    const score = rotationGap * 6 + twinCloseness * 4 + (width !== depth ? 12 : 0) + raw.length * 0.35;
+
+    if (!best || score > best.score) best = { source: raw, twin, score };
+    if (rotationGap >= 18 && twinCloseness >= 52) break;
+  }
+
+  if (best) return best;
+
+  const fallback = normalizeOccupied(buildAssembly(makeRandomSettings(PRESET)));
+  const correct = rotate90CWLocal(fallback);
+  return { source: fallback, twin: buildNearRotatedTwin(correct, fallback) || correct.filter((_, i) => i !== correct.length - 1), score: 0 };
+}
+function buildQuestion() {
+  const seed = buildDistinctBlock();
+  const source = seed.source;
+  const correct = rotate90CWLocal(source);
+  const nearMiss = normalizeOccupied(seed.twin || buildNearRotatedTwin(correct, source));
+  const used = new Set();
+  const options = [];
+
+  function addOption(occupied, isCorrect, label) {
+    const norm = normalizeOccupied(occupied);
+    const sig = makeSignature(norm);
+    if (used.has(sig) || !withinGrid(norm)) return false;
+    used.add(sig);
+    options.push({ occupied: norm, isCorrect, label, id: Math.random().toString(36).slice(2, 9), uiState: '' });
+    return true;
+  }
+
+  addOption(correct, true, 'exact 90 degree clockwise turn');
+  addOption(nearMiss, false, 'close rotated fake');
+
+  const extraPool = [
+    { occupied: source, label: 'original shape trap' },
+    { occupied: rotate180Local(source), label: '180 degree turn trap' },
+    { occupied: rotate270Local(source), label: 'counterclockwise trap' },
+    { occupied: mirrorXLocal(correct), label: 'mirror trap' },
+    { occupied: mirrorYLocal(correct), label: 'mirror trap' },
+    { occupied: mirrorXLocal(source), label: 'source mirror trap' }
+  ]
+    .filter(entry => withinGrid(entry.occupied))
+    .sort((a, b) => projectionSimilarity(correct, a.occupied) - projectionSimilarity(correct, b.occupied));
+
+  for (const entry of extraPool) {
+    addOption(entry.occupied, false, entry.label);
+    if (options.length === 4) break;
+  }
+
+  return {
+    source,
+    correctSignature: makeSignature(correct),
+    options: shuffle(options.slice(0, 4))
+  };
+}
+function setMessage(text, tone=''){ els.messageBar.textContent=text; els.messageBar.className=`messageBar${tone ? ' ' + tone : ''}`; }
+function updateHeader(){ els.studentDisplay.textContent=state.player.name || '—'; els.classDisplay.textContent=state.player.className || '—'; els.scoreDisplay.textContent=`${state.solved} / ${state.sheetSize}`; els.correctDisplay.textContent=String(state.correct); els.wrongDisplay.textContent=String(state.wrong); }
+function render(){ if(!state.current) return; updateHeader(); els.focusTitle.textContent=`Question ${state.solved + 1} of ${state.sheetSize}`; renderIsoCanvas(els.sourceCanvas, state.current.source); els.optionGrid.innerHTML=''; state.current.options.forEach((option,index)=>{ const card=document.createElement('button'); card.type='button'; card.className=`optionCard${option.uiState ? ' ' + option.uiState : ''}${state.lock ? ' locked' : ''}`; card.innerHTML=`<div class="optionCardHeader"><div class="optionNum">Option ${index+1}</div><div class="optionTag">Rotated shape</div></div><canvas></canvas><div class="optionFoot">Tap to choose this rotated result.</div>`; card.addEventListener('click',()=>submitOption(option.id)); els.optionGrid.appendChild(card); renderIsoCanvas(card.querySelector('canvas'), option.occupied); }); }
+function startRound(){ const name=els.studentName.value.trim(), className=els.studentClass.value.trim(); if(!name || !className){ setMessage('Enter both student name and class before starting.', 'warn'); return; } state.player={name, className}; state.running=true; state.correct=0; state.wrong=0; state.solved=0; state.lock=false; state.current=buildQuestion(); els.setupScreen.classList.add('hidden'); els.gameScreen.classList.add('active'); render(); setMessage('Round started. Two options may both look rotated, but only one is exactly right.', ''); }
+function nextQuestion(){ if(state.solved >= state.sheetSize){ setMessage(`${state.player.name} finished with ${state.correct} correct and ${state.wrong} wrong.`, 'good'); state.lock=true; return; } state.lock=false; state.current=buildQuestion(); render(); }
+function submitOption(id){ if(!state.running || state.lock || !state.current) return; const option=state.current.options.find(o=>o.id===id); if(!option) return; state.lock=true; state.current.options.forEach(o => o.uiState = o.id===id ? (o.isCorrect ? 'correct' : 'wrong') : (o.isCorrect ? 'correct' : '')); render(); if(option.isCorrect){ state.correct++; state.solved++; setMessage('Correct rotation.', 'good'); } else { state.wrong++; state.solved++; setMessage(`Not quite. One rotated option is a close fake, but the green shape is the exact 90 degree clockwise turn.`, 'bad'); } updateHeader(); setTimeout(() => nextQuestion(), 900); }
+function resetToSetup(){ state.running=false; state.lock=false; state.current=null; els.gameScreen.classList.remove('active'); els.setupScreen.classList.remove('hidden'); updateHeader(); setMessage('Ready for the next student.', ''); }
+document.getElementById('startBtn').addEventListener('click', startRound);
+document.getElementById('demoBtn').addEventListener('click', ()=>{ els.studentName.value='Sample Student'; els.studentClass.value='Tech 10'; setMessage('Demo details added. Press Start round when ready.', ''); });
+document.getElementById('skipBtn').addEventListener('click', ()=>{ if(!state.running||state.lock) return; state.current=buildQuestion(); render(); setMessage('Fresh question loaded.', ''); });
+document.getElementById('resetBtn').addEventListener('click', resetToSetup);
+window.addEventListener('resize', ()=>{ if(state.current) render(); });
+updateHeader();
+</script>
+</body>
+</html>
