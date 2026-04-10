@@ -488,6 +488,20 @@
       Reliever pack pages
       <input id="packCount" type="number" min="1" max="40" value="6" />
     </label>
+    <label>
+  Width (W)
+  <input id="widthInput" type="number" min="2" max="8" value="4" />
+</label>
+
+<label>
+  Depth (D)
+  <input id="depthInput" type="number" min="2" max="8" value="6" />
+</label>
+
+<label>
+  Height (H)
+  <input id="heightInput" type="number" min="2" max="8" value="4" />
+</label>
     <button id="newBtn" type="button">New worksheet</button>
     <button id="printBtn" type="button">Print worksheet</button>
     <button id="printPackBtn" type="button">Print reliever pack</button>
@@ -497,9 +511,9 @@
   <div id="pagesContainer"></div>
 
   <script>
-    const W = 2;
-    const D = 3;
-    const H = 2;
+   let W = 4;
+   let D = 6;
+   let H = 4;
     const TILE_W = 32;
     const TILE_H = 16;
     const CUBE_H = 20;
@@ -545,6 +559,10 @@
     const printPackBtn = document.getElementById('printPackBtn');
     const packCountInput = document.getElementById('packCount');
 
+    const widthInput = document.getElementById('widthInput');
+    const depthInput = document.getElementById('depthInput');
+    const heightInput = document.getElementById('heightInput');
+
     const state = {
       renderedPages: [],
     };
@@ -585,6 +603,12 @@
 
       return { minX, maxX, minY, maxY };
     }
+
+    function updateDimensions() {
+  W = Math.max(2, Math.min(8, Number(widthInput.value) || 3));
+  D = Math.max(2, Math.min(8, Number(depthInput.value) || 3));
+  H = Math.max(2, Math.min(8, Number(heightInput.value) || 3));
+}
 
     function drawCube(ctx, x, y, z, originX, originY, occupiedSet) {
       const p = iso(x, y, z, originX, originY);
@@ -1697,6 +1721,7 @@
     }
 
     function createWorksheetRecord(sheetNo, totalSheets, stampParts) {
+      updateDimensions();
       const blocks = buildDistinctBlocks(BLOCK_COUNT);
       const viewTiles = makeViewTiles(blocks);
       const answers = viewTiles.map((tile, index) => `${index + 1}. ${tile.letter} - ${titleCaseMode(tile.mode)}`);
