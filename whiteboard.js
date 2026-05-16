@@ -9,7 +9,7 @@
    - whiteboard.ui.js
 
    Keeps:
-   - pen / eraser / line / rect / circle / arc / arrow / text / polyFill
+   - pen / eraser / line / rect / circle / arc / arrow / text / polyFill / curve
    - selection move / scale / rotate
    - background move / scale / rotate
    - SVG reveal + playback
@@ -35,6 +35,23 @@
 
   const dockBtns = Array.from(document.querySelectorAll(".dockBtn[data-tool]"));
   const clearBtn = document.getElementById("clearBtn");
+  const hideSelectedBtn = document.getElementById("hideSelectedBtn");
+  const unhideAllBtn = document.getElementById("unhideAllBtn");
+  const hideSelectedPanelBtn = document.getElementById("hideSelectedPanelBtn");
+  const unhideAllPanelBtn = document.getElementById("unhideAllPanelBtn");
+  const visibilityPrevBtn = document.getElementById("visibilityPrevBtn");
+  const visibilityNextBtn = document.getElementById("visibilityNextBtn");
+  const visibilityPlayBtn = document.getElementById("visibilityPlayBtn");
+  const visibilityTimingBtn = document.getElementById("visibilityTimingBtn");
+  const visibilityPrevPanelBtn = document.getElementById("visibilityPrevPanelBtn");
+  const visibilityNextPanelBtn = document.getElementById("visibilityNextPanelBtn");
+  const visibilityPlayPanelBtn = document.getElementById("visibilityPlayPanelBtn");
+  const visibilityTimingPanelBtn = document.getElementById("visibilityTimingPanelBtn");
+  const snipJoinBtn = document.getElementById("snipJoinBtn");
+  const linkInspector = document.getElementById("linkInspector");
+  const linkInspectorBody = document.getElementById("linkInspectorBody");
+  const linkInspectorCheckBtn = document.getElementById("linkInspectorCheckBtn");
+  const linkInspectorRepairBtn = document.getElementById("linkInspectorRepairBtn");
    const undoBtn = document.getElementById("undoBtn");
 const redoBtn = document.getElementById("redoBtn");
 
@@ -141,6 +158,7 @@ clipboard: null,
   // SVG reveal state
   let _nextObjId = 1;
   const svgReveal = { active: false, groupId: null, partIds: [], revealed: 0 };
+  const MANUAL_HIDDEN_REVEAL_GROUP = "__manual_hidden_objects__";
 
   function ensureObjId(o) {
     if (!o) return null;
@@ -151,6 +169,11 @@ clipboard: null,
   function findObjById(id) {
     if (!id) return null;
     return state.objects.find(o => o && o._id === id) || null;
+  }
+
+  function findObjIndexById(id) {
+    if (!id) return -1;
+    return state.objects.findIndex(o => o && o._id === id);
   }
 
   const svgPlayback = {
@@ -165,10 +188,16 @@ clipboard: null,
   const arcDraft = { hasCenter: false, cx: 0, cy: 0 };
 
   // PolyFill draft
-  const polyDraft = { active: false, pts: [], hover: null };
+  const polyDraft = { active: false, pts: [], links: [], hover: null };
+
+  // Last drawn line/arrow is used as the default Snip + Join primary line.
+  let lastDrawnLineId = null;
+
+  // Link inspector / repair overlay. Items are screen/world markers drawn over the UI canvas.
+  const linkDebugOverlay = { visible: false, items: [], lastCheckAt: 0, targetId: null };
 
   // Selection handles cache
-  const uiHandles = { visible: false, box: null, rotate: null, corners: null, poly: null, center: null };
+  const uiHandles = { visible: false, box: null, rotate: null, corners: null, poly: null, center: null, perspective: null, perspectiveSource: null, lineEndpoints: null };
 
   // Gesture state
   const gesture = {
@@ -194,7 +223,13 @@ clipboard: null,
     arcLastA: 0,
     arcAccum: 0,
 
-    snapCache: null
+    snapCache: null,
+    perspectivePointName: null,
+    perspectivePointCluster: null,
+    lineAnchorRef: null,
+    lineEndAnchorRef: null,
+    lineResizeEnd: null,
+    forceLinkActive: false
   };
 
   let spacePanning = false;
@@ -294,6 +329,64 @@ state.selection = [];
     if (patch.color != null) preset.color = String(patch.color);
     if (patch.size != null) preset.size = clamp(Number(patch.size || preset.size), 1, 60);
     syncLinePresetInputs();
+  }
+
+  function applyLineStylePreset(style, show = true) {
+    const picked = style || "solid";
+    const patch = { lineStyle: picked };
+    if (picked === "reference" || picked === "hidden" || picked === "center") {
+      const preset = state.linePresetMap?.[picked] || {};
+      patch.color = preset.color || (picked === "reference" ? "#1b5e20" : picked === "hidden" ? "#1976d2" : "#d32f2f");
+      patch.size = clamp(Number(preset.size || 10), 1, 60);
+      patch.opacity = 1;
+      state.color = patch.color;
+      state.size = patch.size;
+      state.opacity = patch.opacity;
+    }
+    state.lineStyle = picked;
+    updateBrushUI();
+    if (state.selectionIndex >= 0) applyStyleToSelection(patch);
+    if (show) showToast(picked === "solid" ? "Line style: solid" : `Line style: ${picked} (${patch.color}, ${patch.size}px)`);
+  }
+
+  function applyDrawingPreset(name, show = true) {
+    const picked = name || "construction";
+    const patch = {};
+    if (picked === "construction") {
+      patch.color = "#111111";
+      patch.size = 5;
+      patch.opacity = 0.85;
+      patch.lineStyle = "solid";
+    } else if (picked === "outline") {
+      patch.color = "#111111";
+      patch.size = 15;
+      patch.opacity = 1;
+      patch.lineStyle = "solid";
+    } else if (picked === "fill") {
+      patch.size = 40;
+      patch.opacity = 0.25;
+      patch.lineStyle = "solid";
+    } else if (picked === "reference" || picked === "hidden" || picked === "center") {
+      const preset = state.linePresetMap?.[picked] || {};
+      patch.color = preset.color || (picked === "reference" ? "#1b5e20" : picked === "hidden" ? "#1976d2" : "#d32f2f");
+      patch.size = clamp(Number(preset.size || 10), 1, 60);
+      patch.opacity = 1;
+      patch.lineStyle = picked;
+    } else {
+      return false;
+    }
+
+    if (patch.color != null) state.color = patch.color;
+    if (patch.size != null) state.size = patch.size;
+    if (patch.opacity != null) state.opacity = patch.opacity;
+    state.lineStyle = patch.lineStyle || "solid";
+    updateBrushUI();
+    if (state.selectionIndex >= 0) applyStyleToSelection(patch);
+    if (show) {
+      const label = picked === "fill" ? "Fill" : picked[0].toUpperCase() + picked.slice(1);
+      showToast(`Preset: ${label}`);
+    }
+    return true;
   }
 
   function pxPerMm() {
@@ -501,14 +594,94 @@ state.selection = [];
     uiHandles.corners = null;
     uiHandles.poly = null;
     uiHandles.center = null;
+    uiHandles.perspective = null;
+    uiHandles.perspectiveSource = null;
+    uiHandles.lineEndpoints = null;
 
     if (state.tool !== "select") return;
     if (state.selectionIndex < 0) return;
     const obj = state.objects[state.selectionIndex];
     if (!obj) return;
 
+    if (obj.kind === "perspectiveGuide") {
+      const vps = [];
+      if (obj.vp1) vps.push({ name: "vp1", ...worldToScreen(obj.vp1.x, obj.vp1.y) });
+      if ((obj.mode || 1) >= 2 && obj.vp2) vps.push({ name: "vp2", ...worldToScreen(obj.vp2.x, obj.vp2.y) });
+      if (!vps.length) return;
+
+      const b = objectBounds(obj);
+      const p1 = worldToScreen(b.minX, b.minY);
+      const p2 = worldToScreen(b.maxX, b.maxY);
+      const x = Math.min(p1.x, p2.x);
+      const y = Math.min(p1.y, p2.y);
+      const w = Math.abs(p2.x - p1.x);
+      const h = Math.abs(p2.y - p1.y);
+
+      uiHandles.visible = true;
+      uiHandles.box = { x, y, w, h };
+      uiHandles.perspective = vps.map(vp => ({ ...vp, r: 9 }));
+
+      const target = findObjById(obj.targetId);
+      if (target && !target.hidden) {
+        const tb = objectBounds(target);
+        const tp1 = worldToScreen(tb.minX, tb.minY);
+        const tp2 = worldToScreen(tb.maxX, tb.maxY);
+        let sx = Math.min(tp1.x, tp2.x);
+        let sy = Math.min(tp1.y, tp2.y);
+        let sw = Math.abs(tp2.x - tp1.x);
+        let sh = Math.abs(tp2.y - tp1.y);
+        const pad = 10;
+        sx -= pad;
+        sy -= pad;
+        sw += pad * 2;
+        sh += pad * 2;
+        if (sw < 34) {
+          sx -= (34 - sw) / 2;
+          sw = 34;
+        }
+        if (sh < 34) {
+          sy -= (34 - sh) / 2;
+          sh = 34;
+        }
+        uiHandles.perspectiveSource = {
+          targetId: obj.targetId,
+          x: sx,
+          y: sy,
+          w: sw,
+          h: sh,
+          cx: sx + sw / 2,
+          cy: sy + sh / 2,
+          r: 12
+        };
+      }
+
+      uiHandles.corners = [];
+      uiHandles.rotate = null;
+      return;
+    }
+
     const b = objectBounds(obj);
     const hasOwnRot = (obj.kind === "rect" || obj.kind === "circle" || obj.kind === "text") && (obj.rot || 0);
+    if (obj.kind === "line" || obj.kind === "arrow") {
+      const a = worldToScreen(obj.x1, obj.y1);
+      const bpt = worldToScreen(obj.x2, obj.y2);
+      const pad = 8;
+      uiHandles.visible = true;
+      uiHandles.box = {
+        x: Math.min(a.x, bpt.x) - pad,
+        y: Math.min(a.y, bpt.y) - pad,
+        w: Math.abs(bpt.x - a.x) + pad * 2,
+        h: Math.abs(bpt.y - a.y) + pad * 2
+      };
+      uiHandles.lineEndpoints = [
+        { name: "start", x: a.x, y: a.y, r: 8 },
+        { name: "end", x: bpt.x, y: bpt.y, r: 8 }
+      ];
+      uiHandles.corners = [];
+      uiHandles.rotate = null;
+      return;
+    }
+
 
     if (hasOwnRot) {
       let w = b.maxX - b.minX;
@@ -582,6 +755,27 @@ state.selection = [];
   function hitHandle(sx, sy) {
     if (!uiHandles.visible) return null;
 
+    if (uiHandles.perspective) {
+      for (const p of uiHandles.perspective) {
+        const dx = sx - p.x;
+        const dy = sy - p.y;
+        if (Math.hypot(dx, dy) <= p.r + 7) return { kind: "perspectivePoint", point: p.name };
+      }
+
+      const src = uiHandles.perspectiveSource;
+      if (src) {
+        const nearCenter = Math.hypot(sx - src.cx, sy - src.cy) <= src.r + 12;
+        const inBox = sx >= src.x && sx <= src.x + src.w && sy >= src.y && sy <= src.y + src.h;
+        if (nearCenter || inBox) return { kind: "perspectiveSource", targetId: src.targetId };
+      }
+    }
+
+    if (uiHandles.lineEndpoints) {
+      for (const p of uiHandles.lineEndpoints) {
+        if (Math.hypot(sx - p.x, sy - p.y) <= p.r + 8) return { kind: "lineEnd", endName: p.name };
+      }
+    }
+
     if (uiHandles.rotate) {
       const dx = sx - uiHandles.rotate.x;
       const dy = sy - uiHandles.rotate.y;
@@ -617,6 +811,24 @@ state.selection = [];
     return null;
   }
 
+  function hitPerspectivePointAnywhere(sx, sy) {
+    const tol = 18;
+    for (let i = state.objects.length - 1; i >= 0; i--) {
+      const obj = state.objects[i];
+      if (!obj || obj.hidden || obj.kind !== "perspectiveGuide") continue;
+      const points = [];
+      if (obj.vp1) points.push({ name: "vp1", p: obj.vp1 });
+      if ((obj.mode || 1) >= 2 && obj.vp2) points.push({ name: "vp2", p: obj.vp2 });
+      for (const item of points) {
+        const sp = worldToScreen(item.p.x, item.p.y);
+        if (Math.hypot(sx - sp.x, sy - sp.y) <= tol) {
+          return { index: i, name: item.name };
+        }
+      }
+    }
+    return null;
+  }
+
   /* =========================
      Modules
   ========================= */
@@ -638,12 +850,14 @@ state.selection = [];
     segIntersection,
     getLineDash,
     svgDashArray,
-    detectLineStyleFromDashArray
+    detectLineStyleFromDashArray,
+    findObjById
   });
 
   const {
     pointOnArc,
     rectEdges,
+    perspectiveTargetPoints,
     objectBounds,
     findHit,
     moveObject,
@@ -658,6 +872,1249 @@ state.selection = [];
     snapPolyPoint,
     exportWorldBounds
   } = geometry;
+
+  function cloneRef(ref) {
+    return ref ? JSON.parse(JSON.stringify(ref)) : null;
+  }
+
+  function isLinkRef(ref) {
+    return !!ref && (ref.type === "anchor" || ref.type === "intersection" || ref.type === "segmentPoint");
+  }
+
+  function preferredAnchorAt(pt) {
+    const cache = gesture.snapCache || { endpoints: [] };
+    const radiusWorld = SNAP_RADIUS_PX / (state.zoom || 1);
+    let best = null;
+    let bestD = radiusWorld;
+
+    for (const candidate of cache.endpoints || []) {
+      if (!candidate.ref || candidate.ref.type !== "anchor") continue;
+      const d = Math.hypot(pt.x - candidate.x, pt.y - candidate.y);
+      if (d <= bestD) {
+        bestD = d;
+        best = candidate;
+      }
+    }
+
+    return best ? { x: best.x, y: best.y, ref: cloneRef(best.ref) } : null;
+  }
+
+  function textCornerPoint(obj, index) {
+    const m = textMetrics(obj);
+    const cx = obj.x + m.w / 2;
+    const cy = obj.y + m.h / 2;
+    const ang = obj.rot || 0;
+    const pts = [
+      { x: obj.x,       y: obj.y },
+      { x: obj.x + m.w, y: obj.y },
+      { x: obj.x + m.w, y: obj.y + m.h },
+      { x: obj.x,       y: obj.y + m.h }
+    ].map(point => (ang ? rotateAround(point.x, point.y, cx, cy, ang) : point));
+    return pts[Math.max(0, Math.min(3, index || 0))] || null;
+  }
+
+  function circleQuarterPoint(obj, index) {
+    const cx = (obj.x1 + obj.x2) / 2;
+    const cy = (obj.y1 + obj.y2) / 2;
+    const rx = Math.abs(obj.x2 - obj.x1) / 2;
+    const ry = Math.abs(obj.y2 - obj.y1) / 2;
+    const ang = obj.rot || 0;
+    const t = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2][Math.max(0, Math.min(3, index || 0))] || 0;
+    const ex = Math.cos(t) * rx;
+    const ey = Math.sin(t) * ry;
+    return {
+      x: cx + ex * Math.cos(ang) - ey * Math.sin(ang),
+      y: cy + ex * Math.sin(ang) + ey * Math.cos(ang)
+    };
+  }
+
+  function resolveSegmentRef(ref) {
+    if (!ref) return null;
+
+    if (ref.type === "perspectiveRay") {
+      const guide = findObjById(ref.guideId);
+      if (!guide || guide.kind !== "perspectiveGuide") return null;
+      const target = findObjById(guide.targetId);
+      const vp = guide[ref.vpName];
+      if (!target || !vp) return null;
+      const pts = perspectiveTargetPoints ? perspectiveTargetPoints(target, vp, guide) : [];
+      const src = pts[Math.max(0, Math.min(pts.length - 1, Number(ref.sourceIndex) || 0))];
+      return src ? { x1: src.x, y1: src.y, x2: vp.x, y2: vp.y } : null;
+    }
+
+    if (ref.type !== "segment" || !ref.objId) return null;
+    const obj = findObjById(ref.objId);
+    if (!obj) return null;
+
+    if ((obj.kind === "line" || obj.kind === "arrow") && ref.kind === "line") {
+      return { x1: obj.x1, y1: obj.y1, x2: obj.x2, y2: obj.y2 };
+    }
+
+    if (obj.kind === "rect" && ref.kind === "rectEdge") {
+      const edges = rectEdges(obj);
+      return edges[Number(ref.index) || 0] || null;
+    }
+
+    if (obj.kind === "polyFill" && ref.kind === "polyEdge") {
+      const pts = obj.pts || [];
+      const i = Number(ref.index) || 0;
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      return a && b ? { x1: a.x, y1: a.y, x2: b.x, y2: b.y } : null;
+    }
+
+    if (obj.kind === "text" && ref.kind === "textEdge") {
+      const i = Number(ref.index) || 0;
+      const a = textCornerPoint(obj, i);
+      const b = textCornerPoint(obj, (i + 1) % 4);
+      return a && b ? { x1: a.x, y1: a.y, x2: b.x, y2: b.y } : null;
+    }
+
+    return null;
+  }
+
+  function resolveIntersectionPoint(ref) {
+    if (!ref || ref.type !== "intersection") return null;
+    const a = resolveSegmentRef(ref.a);
+    const b = resolveSegmentRef(ref.b);
+    if (!a || !b) return null;
+    return segIntersection(a, b);
+  }
+
+  function resolveSegmentPoint(ref) {
+    if (!ref || ref.type !== "segmentPoint") return null;
+    const seg = resolveSegmentRef(ref.segment);
+    if (!seg) return null;
+    const t = Math.max(0, Math.min(1, Number(ref.t) || 0));
+    return {
+      x: seg.x1 + (seg.x2 - seg.x1) * t,
+      y: seg.y1 + (seg.y2 - seg.y1) * t
+    };
+  }
+
+  function resolveAnchorPoint(ref) {
+    if (!ref) return null;
+    if (ref.type === "intersection") return resolveIntersectionPoint(ref);
+    if (ref.type === "segmentPoint") return resolveSegmentPoint(ref);
+    if (ref.type !== "anchor") return null;
+    const obj = findObjById(ref.objId);
+    if (!obj) return null;
+    const index = ref.index || 0;
+
+    if ((obj.kind === "line" || obj.kind === "arrow") && ref.kind === "lineEnd") {
+      return index === 1 ? { x: obj.x2, y: obj.y2 } : { x: obj.x1, y: obj.y1 };
+    }
+
+    if (obj.kind === "rect" && ref.kind === "rectCorner") {
+      const corners = rectEdges(obj).map(edge => ({ x: edge.x1, y: edge.y1 }));
+      return corners[Math.max(0, Math.min(3, index))] || null;
+    }
+
+    if (obj.kind === "circle" && ref.kind === "circleQuarter") {
+      return circleQuarterPoint(obj, index);
+    }
+
+    if (obj.kind === "circle" && ref.kind === "circleTangent") {
+      const guide = findObjById(ref.guideId);
+      const vp = guide && guide.kind === "perspectiveGuide" ? guide[ref.vpName] : null;
+      const pts = perspectiveTargetPoints ? perspectiveTargetPoints(obj, vp, guide) : [];
+      const side = Number.isFinite(Number(ref.side)) ? Number(ref.side) : index;
+      const pt = pts[Math.max(0, Math.min(pts.length - 1, side || 0))];
+      return pt ? { x: pt.x, y: pt.y } : null;
+    }
+
+    if (obj.kind === "arc" && ref.kind === "arcEnd") {
+      return pointOnArc(obj, index === 1 ? "end" : "start");
+    }
+
+    if (obj.kind === "arc" && ref.kind === "arcTangent") {
+      const guide = findObjById(ref.guideId);
+      const vp = guide && guide.kind === "perspectiveGuide" ? guide[ref.vpName] : null;
+      const pts = perspectiveTargetPoints ? perspectiveTargetPoints(obj, vp, guide) : [];
+      const side = Number.isFinite(Number(ref.side)) ? Number(ref.side) : index;
+      const pt = pts[Math.max(0, Math.min(pts.length - 1, side || 0))];
+      return pt ? { x: pt.x, y: pt.y } : null;
+    }
+
+    if (obj.kind === "polyFill" && ref.kind === "polyVertex") {
+      const pt = (obj.pts || [])[index];
+      return pt ? { x: pt.x, y: pt.y } : null;
+    }
+
+    if ((obj.kind === "stroke" || obj.kind === "erase") && ref.kind === "strokeEnd") {
+      const pts = obj.points || [];
+      const pt = index === 1 ? pts[pts.length - 1] : pts[0];
+      return pt ? { x: pt.x, y: pt.y } : null;
+    }
+
+    if (obj.kind === "text" && ref.kind === "textCorner") {
+      return textCornerPoint(obj, index);
+    }
+
+    return null;
+  }
+
+  function resolveVanishingPoint(ref) {
+    if (!ref || !ref.guideId || !ref.vpName) return null;
+    const guide = findObjById(ref.guideId);
+    if (!guide || guide.kind !== "perspectiveGuide") return null;
+    const vp = guide[ref.vpName];
+    return vp ? { x: vp.x, y: vp.y } : null;
+  }
+
+  function normalizePerspectiveAnchorForVP(anchorRef, perspectiveRef, startPt) {
+    if (!anchorRef || anchorRef.type !== "anchor" || !perspectiveRef) return anchorRef;
+    const obj = findObjById(anchorRef.objId);
+    if (!obj || (obj.kind !== "circle" && obj.kind !== "arc")) return anchorRef;
+
+    const guide = findObjById(perspectiveRef.guideId);
+    const vp = guide && guide.kind === "perspectiveGuide" ? guide[perspectiveRef.vpName] : null;
+    if (!vp || !perspectiveTargetPoints) return anchorRef;
+
+    const tangents = perspectiveTargetPoints(obj, vp, guide).filter(p => p && p.ref);
+    if (!tangents.length) return anchorRef;
+    if (anchorRef.kind === "circleTangent" || anchorRef.kind === "arcTangent") return anchorRef;
+
+    let best = tangents[0];
+    let bestD = Infinity;
+    const probe = startPt || resolveAnchorPoint(anchorRef) || (obj.kind === "arc" ? { x: obj.cx + obj.r, y: obj.cy } : { x: obj.x1, y: obj.y1 });
+    for (const t of tangents) {
+      const d = Math.hypot(t.x - probe.x, t.y - probe.y);
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    return best.ref ? cloneRef(best.ref) : anchorRef;
+  }
+
+  function findBestLinkRefAtPoint(pt, skipObjId) {
+    const saved = gesture.snapCache;
+    gesture.snapCache = buildSnapCache(skipObjId);
+    const hit = snapPointPreferEndsIntersections(pt);
+    gesture.snapCache = saved;
+    return hit && hit.ref && isLinkRef(hit.ref) ? cloneRef(hit.ref) : null;
+  }
+
+  function stableEndpointSnapForPerspectivePoint(rawPt, opts = {}) {
+    const bypassSnap = !!opts.bypassSnap;
+    if (bypassSnap) return { x: rawPt.x, y: rawPt.y };
+
+    const radiusWorld = SNAP_RADIUS_PX / Math.max(0.001, state.zoom || 1);
+    const cache = gesture.snapCache || buildSnapCache(opts.skipObjId);
+    let best = null;
+    let bestD = radiusWorld;
+
+    // Perspective handles used to snap to every line intersection, including the
+    // temporary intersections created by their own projection rays. With lots of
+    // construction lines that made a moving vanishing point suddenly jump to a
+    // far, stale-looking point. Keep handles snappable, but only to stable real
+    // endpoints/corners by default.
+    for (const c of cache.endpoints || []) {
+      if (!c || !Number.isFinite(c.x) || !Number.isFinite(c.y)) continue;
+      if (!c.ref) continue;
+      if (c.ref.type === "perspectivePoint") continue;
+      if (isPerspectiveConstructionRef(c.ref)) continue;
+      const d = Math.hypot(rawPt.x - c.x, rawPt.y - c.y);
+      if (d <= bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+
+    if (best) return { x: best.x, y: best.y, ref: cloneRef(best.ref) };
+    if (opts.gridSnap) return snapToMmGridWorld(rawPt);
+    return { x: rawPt.x, y: rawPt.y };
+  }
+
+  function lineSegmentFromObject(obj) {
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow")) return null;
+    if (![obj.x1, obj.y1, obj.x2, obj.y2].every(Number.isFinite)) return null;
+    if (Math.hypot(obj.x2 - obj.x1, obj.y2 - obj.y1) <= 0.001) return null;
+    return { x1: obj.x1, y1: obj.y1, x2: obj.x2, y2: obj.y2 };
+  }
+
+  function pointProjectionOnSegment(pt, seg) {
+    const vx = seg.x2 - seg.x1;
+    const vy = seg.y2 - seg.y1;
+    const len2 = vx * vx + vy * vy;
+    if (len2 <= 1e-9) return null;
+    const t = clamp((((pt.x - seg.x1) * vx) + ((pt.y - seg.y1) * vy)) / len2, 0, 1);
+    return {
+      x: seg.x1 + vx * t,
+      y: seg.y1 + vy * t,
+      t
+    };
+  }
+
+  function segmentPointRefForLine(obj, t) {
+    if (!obj || !obj._id) return null;
+    return {
+      type: "segmentPoint",
+      segment: { type: "segment", objId: obj._id, kind: "line" },
+      t: clamp(t || 0, 0, 1)
+    };
+  }
+
+  function lineEndPoint(obj, endName) {
+    if (!obj) return null;
+    return endName === "end" ? { x: obj.x2, y: obj.y2 } : { x: obj.x1, y: obj.y1 };
+  }
+
+  function lineEndRef(obj, endName) {
+    if (!obj) return null;
+    ensureObjId(obj);
+    return { type: "anchor", objId: obj._id, kind: "lineEnd", index: endName === "end" ? 1 : 0 };
+  }
+
+  function nearestLineEndName(obj, p) {
+    const ds = Math.hypot(obj.x1 - p.x, obj.y1 - p.y);
+    const de = Math.hypot(obj.x2 - p.x, obj.y2 - p.y);
+    return de < ds ? "end" : "start";
+  }
+
+  function setLineEndPoint(obj, endName, p) {
+    if (!obj || !p) return false;
+    if (endName === "end") {
+      obj.x2 = p.x;
+      obj.y2 = p.y;
+    } else {
+      obj.x1 = p.x;
+      obj.y1 = p.y;
+    }
+    return true;
+  }
+
+  function lineTForPoint(obj, p) {
+    const seg = lineSegmentFromObject(obj);
+    if (!seg || !p) return 0;
+    const hit = pointProjectionOnSegment(p, seg);
+    return hit ? clamp(hit.t, 0, 1) : 0;
+  }
+
+  function cutPerspectiveLineEndToPoint(obj, p) {
+    if (!obj || !obj.perspectiveLink || !p) return false;
+    const anchor = resolveAnchorPoint(obj.perspectiveLink.anchor);
+    const vp = resolveVanishingPoint(obj.perspectiveLink.vp);
+    if (!anchor || !vp) return false;
+    const full = Math.hypot(vp.x - anchor.x, vp.y - anchor.y);
+    const partial = Math.hypot(p.x - anchor.x, p.y - anchor.y);
+    if (!Number.isFinite(full) || full <= 0.001 || !Number.isFinite(partial)) return false;
+
+    obj.perspectiveLink.endMode = "length";
+    obj.perspectiveLink.rayT = Math.max(0.001, partial / full);
+    obj.perspectiveLink.lengthWorld = partial;
+    obj.x1 = anchor.x;
+    obj.y1 = anchor.y;
+    obj.x2 = p.x;
+    obj.y2 = p.y;
+    return true;
+  }
+
+  function snapRefForPolyPoint(p) {
+    if (!p || !p.ref || !isLinkRef(p.ref)) return null;
+    return cloneRef(p.ref);
+  }
+
+  function lineLikeObjById(id) {
+    const obj = findObjById(id);
+    return obj && !obj.hidden && (obj.kind === "line" || obj.kind === "arrow") ? obj : null;
+  }
+
+  function lastDrawnSnipLine() {
+    return lineLikeObjById(lastDrawnLineId);
+  }
+
+  function linkPolyFillVerticesNearPoint(point, ref, skipObjIds = []) {
+    if (!point || !ref) return 0;
+    const skip = new Set((skipObjIds || []).filter(Boolean));
+    const tol = (SNAP_RADIUS_PX * 1.1) / Math.max(0.001, state.zoom || 1);
+    let count = 0;
+
+    for (const obj of state.objects) {
+      if (!obj || obj.hidden || obj.kind !== "polyFill" || !Array.isArray(obj.pts)) continue;
+      if (obj._id && skip.has(obj._id)) continue;
+      if (!obj.vertexLinks) obj.vertexLinks = [];
+
+      for (let i = 0; i < obj.pts.length; i++) {
+        const pt = obj.pts[i];
+        if (!pt) continue;
+        if (Math.hypot(pt.x - point.x, pt.y - point.y) > tol) continue;
+        if (obj._id && refDependsOnObject(ref, obj._id, new Set())) continue;
+        obj.vertexLinks[i] = cloneRef(ref);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  function selectedSnipLines() {
+    return (state.selection || [])
+      .map(i => state.objects[i])
+      .filter(o => o && !o.hidden && (o.kind === "line" || o.kind === "arrow"));
+  }
+
+  function allSnippableLinesExcept(obj) {
+    return state.objects.filter(o =>
+      o &&
+      o !== obj &&
+      !o.hidden &&
+      (o.kind === "line" || o.kind === "arrow") &&
+      (!obj || o._id !== obj._id)
+    );
+  }
+
+  function findSnipPartnerForSingleLine(primary) {
+    const sa = lineSegmentFromObject(primary);
+    if (!sa) return null;
+
+    const pointer = gesture.lastWorld || gesture.startWorld || null;
+    const nearTol = 24 / (state.zoom || 1);
+    const candidates = [];
+
+    for (const other of allSnippableLinesExcept(primary)) {
+      const sb = lineSegmentFromObject(other);
+      if (!sb) continue;
+      const p = segIntersection(sa, sb);
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+
+      let score = 0;
+      let nearPointer = true;
+      if (pointer) {
+        const dLine = distToSeg(pointer.x, pointer.y, sb.x1, sb.y1, sb.x2, sb.y2);
+        const dHit = Math.hypot(pointer.x - p.x, pointer.y - p.y);
+        score = Math.min(dLine, dHit);
+        nearPointer = score <= nearTol;
+      } else {
+        const aMidX = (sa.x1 + sa.x2) / 2;
+        const aMidY = (sa.y1 + sa.y2) / 2;
+        score = Math.hypot(aMidX - p.x, aMidY - p.y);
+      }
+
+      candidates.push({ line: other, point: p, score, nearPointer });
+    }
+
+    if (!candidates.length) return null;
+    candidates.sort((a, b) => a.score - b.score);
+
+    const nearby = candidates.filter(c => c.nearPointer);
+    if (nearby.length === 1) return nearby[0];
+    if (nearby.length > 1) return nearby[0];
+
+    // If there is only one possible crossing, allow it even without hover help.
+    // If there are several, refuse rather than guessing the wrong one.
+    if (candidates.length === 1) return candidates[0];
+    return { ambiguous: true, count: candidates.length };
+  }
+
+  function snipJoinCandidateLines() {
+    // Safe behaviour:
+    // 1) exactly two selected lines: use those;
+    // 2) one selected line: use the crossing line nearest the pointer/hover;
+    // 3) no selected lines: use the last drawn line as the primary;
+    // 4) otherwise refuse rather than guessing.
+    const selected = selectedSnipLines();
+    if (selected.length >= 2) return selected;
+
+    const primary = selected.length === 1 ? selected[0] : lastDrawnSnipLine();
+    if (!primary) return selected;
+
+    const partner = findSnipPartnerForSingleLine(primary);
+    if (partner && partner.line) return [primary, partner.line];
+    return [primary];
+  }
+
+  function snipAndJoinLineIntersections() {
+    const selected = selectedSnipLines();
+    const lines = snipJoinCandidateLines();
+    if (lines.length < 2) {
+      const primary = selected.length === 1 ? selected[0] : lastDrawnSnipLine();
+      if (primary) {
+        const partner = findSnipPartnerForSingleLine(primary);
+        if (partner && partner.ambiguous) {
+          return { changed: false, count: 0, reason: "Several crossings found — hover near the line/intersection you want, or Shift-click the second line" };
+        }
+        return { changed: false, count: 0, reason: "Hover near the crossing line/intersection, then press J or ✂" };
+      }
+      return { changed: false, count: 0, reason: "Draw/select a line, hover near the crossing line, then press J or ✂" };
+    }
+    if (lines.length > 2) {
+      return { changed: false, count: 0, reason: "Too many lines selected — select the two lines you want to snip" };
+    }
+
+    const a = lines[0];
+    const b = lines[1];
+    if (!a || !b || a === b || a._id === b._id) {
+      return { changed: false, count: 0, reason: "Select two different lines" };
+    }
+
+    const sa = lineSegmentFromObject(a);
+    const sb = lineSegmentFromObject(b);
+    if (!sa || !sb) {
+      return { changed: false, count: 0, reason: "One selected line is too short to snip" };
+    }
+
+    const p = segIntersection(sa, sb);
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+      return { changed: false, count: 0, reason: "Selected lines do not cross each other" };
+    }
+
+    const aEnd = nearestLineEndName(a, p);
+    const bEnd = nearestLineEndName(b, p);
+    const aEndPt = lineEndPoint(a, aEnd);
+    const bEndPt = lineEndPoint(b, bEnd);
+    const aMove = aEndPt ? Math.hypot(aEndPt.x - p.x, aEndPt.y - p.y) : 0;
+    const bMove = bEndPt ? Math.hypot(bEndPt.x - p.x, bEndPt.y - p.y) : 0;
+
+    const aCanCut = !a.perspectiveLink || aEnd === "end";
+    const bCanCut = !b.perspectiveLink || bEnd === "end";
+    if (!aCanCut && !bCanCut) {
+      return { changed: false, count: 0, reason: "Those perspective lines can only be snipped at their free ends" };
+    }
+
+    // Prefer a perspective construction line as the master, so ordinary connector
+    // lines follow the perspective construction rather than driving it.
+    let master = a;
+    let masterEnd = aEnd;
+    let slave = b;
+    let slaveEnd = bEnd;
+
+    const aIsPerspective = isPerspectiveConstructionObject(a);
+    const bIsPerspective = isPerspectiveConstructionObject(b);
+    if (!aIsPerspective && bIsPerspective) {
+      master = b;
+      masterEnd = bEnd;
+      slave = a;
+      slaveEnd = aEnd;
+    } else if (aIsPerspective === bIsPerspective && bMove > aMove) {
+      master = a;
+      masterEnd = aEnd;
+      slave = b;
+      slaveEnd = bEnd;
+    }
+
+    if (master.perspectiveLink) {
+      if (masterEnd !== "end") {
+        return { changed: false, count: 0, reason: "Perspective lines can only be snipped at their free ends" };
+      }
+      cutPerspectiveLineEndToPoint(master, p);
+    } else {
+      setLineEndPoint(master, masterEnd, p);
+      if (master.endpointLinks?.floatFree) delete master.endpointLinks.floatFree;
+    }
+
+    const masterRef = lineEndRef(master, masterEnd);
+    if (!masterRef) return { changed: false, count: 0, reason: "Could not create a join point" };
+
+    if (slave.perspectiveLink) {
+      if (slaveEnd !== "end") {
+        return { changed: false, count: 0, reason: "Perspective lines can only be snipped at their free ends" };
+      }
+      cutPerspectiveLineEndToPoint(slave, p);
+      // Do not endpoint-link a perspective line back to the other line; its own
+      // proportional perspective link should remain the driver.
+    } else {
+      setLineEndPoint(slave, slaveEnd, p);
+      if (!refDependsOnObject(masterRef, slave._id, new Set())) {
+        setEndpointLink(slave, slaveEnd, masterRef);
+      }
+    }
+
+    const polyLinked = linkPolyFillVerticesNearPoint(p, masterRef, [master._id, slave._id]);
+    updatePerspectiveLinks();
+    return { changed: true, count: 1 + polyLinked, reason: "" };
+  }
+
+  function setEndpointLink(obj, endName, ref) {
+    if (!obj || !ref) return false;
+    if (!obj.endpointLinks) obj.endpointLinks = {};
+    const before = JSON.stringify(obj.endpointLinks[endName] || null);
+    obj.endpointLinks[endName] = cloneRef(ref);
+    if (obj.endpointLinks.floatFree) delete obj.endpointLinks.floatFree;
+    return before !== JSON.stringify(obj.endpointLinks[endName]);
+  }
+
+  function refDirectObjIds(ref, out = []) {
+    if (!ref) return out;
+    if ((ref.type === "anchor" || ref.type === "segment") && ref.objId) out.push(ref.objId);
+    if (ref.type === "segmentPoint") refDirectObjIds(ref.segment, out);
+    if (ref.type === "intersection") {
+      refDirectObjIds(ref.a, out);
+      refDirectObjIds(ref.b, out);
+    }
+    if (ref.type === "perspectiveRay" && ref.guideId) out.push(ref.guideId);
+    if (ref.type === "perspectivePoint" && ref.guideId) out.push(ref.guideId);
+    return out;
+  }
+
+  function refDependsOnObject(ref, targetObjId, seen = new Set()) {
+    if (!ref || !targetObjId) return false;
+    for (const id of refDirectObjIds(ref, [])) {
+      if (id === targetObjId) return true;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const obj = findObjById(id);
+      if (objectDependsOnObject(obj, targetObjId, seen)) return true;
+    }
+    return false;
+  }
+
+  function objectDependsOnObject(obj, targetObjId, seen = new Set()) {
+    if (!obj || !targetObjId) return false;
+    if (obj._id === targetObjId) return true;
+    if (obj.perspectiveLink) {
+      if (refDependsOnObject(obj.perspectiveLink.anchor, targetObjId, seen)) return true;
+      if (refDependsOnObject(obj.perspectiveLink.vp, targetObjId, seen)) return true;
+    }
+    if (obj.endpointLinks) {
+      if (refDependsOnObject(obj.endpointLinks.start, targetObjId, seen)) return true;
+      if (refDependsOnObject(obj.endpointLinks.end, targetObjId, seen)) return true;
+    }
+    return false;
+  }
+
+  function sanitizeEndpointLinkCycles(obj) {
+    if (!obj || !obj._id || !obj.endpointLinks) return false;
+    let changed = false;
+    if (refDependsOnObject(obj.endpointLinks.start, obj._id, new Set())) {
+      delete obj.endpointLinks.start;
+      changed = true;
+    }
+    if (refDependsOnObject(obj.endpointLinks.end, obj._id, new Set())) {
+      delete obj.endpointLinks.end;
+      changed = true;
+    }
+    if (!obj.endpointLinks.start && !obj.endpointLinks.end) {
+      delete obj.endpointLinks;
+      changed = true;
+    }
+    return changed;
+  }
+
+  function autoLinkLineObject(obj) {
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow") || obj.perspectiveLink || !obj._id) return false;
+
+    const rawStartRef = findBestLinkRefAtPoint({ x: obj.x1, y: obj.y1 }, obj._id);
+    const rawEndRef = findBestLinkRefAtPoint({ x: obj.x2, y: obj.y2 }, obj._id);
+    const startRef = rawStartRef && !refDependsOnObject(rawStartRef, obj._id, new Set()) ? rawStartRef : null;
+    const endRef = rawEndRef && !refDependsOnObject(rawEndRef, obj._id, new Set()) ? rawEndRef : null;
+
+    if (startRef || endRef) {
+      obj.endpointLinks = {
+        ...(startRef ? { start: startRef } : {}),
+        ...(endRef ? { end: endRef } : {})
+      };
+      updateEndpointLinkedObject(obj);
+      return true;
+    }
+
+    if (obj.endpointLinks) {
+      delete obj.endpointLinks;
+      return true;
+    }
+    return false;
+  }
+
+  function autoLinkLinesTouchingDrawnLine(activeLine) {
+    if (!activeLine || (activeLine.kind !== "line" && activeLine.kind !== "arrow") || !activeLine._id) return false;
+    const activeSeg = lineSegmentFromObject(activeLine);
+    if (!activeSeg) return false;
+
+    const radiusWorld = (SNAP_RADIUS_PX * 1.35) / (state.zoom || 1);
+    let changed = false;
+
+    // First repair the line being drawn: its two ends can link to any line body,
+    // endpoint, intersection, projection ray, or perspective guide ray already under them.
+    changed = autoLinkLineObject(activeLine) || changed;
+
+    for (const obj of state.objects) {
+      if (!obj || obj === activeLine || obj._id === activeLine._id || obj.hidden) continue;
+      if (obj.kind !== "line" && obj.kind !== "arrow") continue;
+      if (obj.perspectiveLink) continue;
+
+      const candidates = [
+        { endName: "start", pt: { x: obj.x1, y: obj.y1 } },
+        { endName: "end", pt: { x: obj.x2, y: obj.y2 } }
+      ];
+
+      for (const c of candidates) {
+        const hit = pointProjectionOnSegment(c.pt, activeSeg);
+        if (!hit) continue;
+        const d = Math.hypot(c.pt.x - hit.x, c.pt.y - hit.y);
+        if (d > radiusWorld) continue;
+        const ref = segmentPointRefForLine(activeLine, hit.t);
+        if (!ref || refDependsOnObject(ref, obj._id, new Set())) continue;
+        changed = setEndpointLink(obj, c.endName, ref) || changed;
+      }
+    }
+
+    updatePerspectiveLinks();
+    return changed;
+  }
+
+  function autoLinkOverlappingLines(lineObjs) {
+    const items = (lineObjs || []).filter(o => o && (o.kind === "line" || o.kind === "arrow"));
+    let changed = false;
+    for (let pass = 0; pass < 3; pass++) {
+      let passChanged = false;
+      for (const obj of items) {
+        passChanged = autoLinkLineObject(obj) || passChanged;
+        passChanged = autoLinkLinesTouchingDrawnLine(obj) || passChanged;
+      }
+      updatePerspectiveLinks();
+      changed = changed || passChanged;
+      if (!passChanged) break;
+    }
+    return changed;
+  }
+
+  function updatePerspectiveLinkedObject(obj) {
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow") || !obj.perspectiveLink) return false;
+    const anchor = resolveAnchorPoint(obj.perspectiveLink.anchor);
+    const vp = resolveVanishingPoint(obj.perspectiveLink.vp);
+    if (!anchor || !vp) return false;
+
+    obj.x1 = anchor.x;
+    obj.y1 = anchor.y;
+
+    const sign = obj.perspectiveLink.direction === -1 ? -1 : 1;
+    const dx = (vp.x - anchor.x) * sign;
+    const dy = (vp.y - anchor.y) * sign;
+    const lenToVp = Math.hypot(vp.x - anchor.x, vp.y - anchor.y);
+    if (!Number.isFinite(lenToVp) || lenToVp < 0.001) return false;
+
+    if (obj.perspectiveLink.endMode === "point") {
+      obj.x2 = vp.x;
+      obj.y2 = vp.y;
+      obj.perspectiveLink.rayT = 1;
+      obj.perspectiveLink.lengthWorld = lenToVp;
+      return true;
+    }
+
+    let rayT = Number(obj.perspectiveLink.rayT);
+    if (!Number.isFinite(rayT) || rayT <= 0) {
+      let lengthWorld = Number(obj.perspectiveLink.lengthWorld);
+      if (!Number.isFinite(lengthWorld) || lengthWorld <= 0.001) {
+        lengthWorld = Math.hypot(obj.x2 - obj.x1, obj.y2 - obj.y1) || pxPerMm();
+      }
+      rayT = Math.max(0.001, lengthWorld / lenToVp);
+      obj.perspectiveLink.rayT = rayT;
+    }
+
+    const lengthWorld = lenToVp * rayT;
+    obj.perspectiveLink.lengthWorld = lengthWorld;
+    obj.x2 = anchor.x + (dx / lenToVp) * lengthWorld;
+    obj.y2 = anchor.y + (dy / lenToVp) * lengthWorld;
+    return true;
+  }
+
+  function ensurePerspectiveExtensionHelper(sourceLine) {
+    if (!sourceLine || (sourceLine.kind !== "line" && sourceLine.kind !== "arrow") || !sourceLine.perspectiveLink || sourceLine.autoPerspectiveHelper) return false;
+    const sourceId = ensureObjId(sourceLine);
+    const vpRef = cloneRef(sourceLine.perspectiveLink.vp);
+    const vp = resolveVanishingPoint(vpRef);
+    if (!vp) return false;
+
+    const existing = state.objects.find(o => o && o.autoPerspectiveHelper && o.helperFor === sourceId);
+    if (existing) {
+      existing.color = "#d32f2f";
+      existing.size = Math.max(3.5, Number(existing.size) || 0);
+      existing.opacity = 0.78;
+      existing.lineStyle = "reference";
+      existing.perspectiveLink = {
+        anchor: { type: "anchor", objId: sourceId, kind: "lineEnd", index: 1 },
+        vp: vpRef,
+        endMode: "point",
+        rayT: 1,
+        direction: 1
+      };
+      updatePerspectiveLinkedObject(existing);
+      return true;
+    }
+
+    const helper = {
+      kind: "line",
+      color: "#d32f2f",
+      size: 3.5,
+      opacity: 0.78,
+      lineStyle: "reference",
+      x1: sourceLine.x2,
+      y1: sourceLine.y2,
+      x2: vp.x,
+      y2: vp.y,
+      rot: 0,
+      autoPerspectiveHelper: true,
+      helperFor: sourceId,
+      perspectiveLink: {
+        anchor: { type: "anchor", objId: sourceId, kind: "lineEnd", index: 1 },
+        vp: vpRef,
+        endMode: "point",
+        rayT: 1,
+        direction: 1
+      }
+    };
+    ensureObjId(helper);
+    state.objects.push(helper);
+    updatePerspectiveLinkedObject(helper);
+    return true;
+  }
+
+  function isPerspectiveConstructionObject(obj, seen = new Set()) {
+    if (!obj) return false;
+    if (obj.kind === "perspectiveGuide") return true;
+    if (obj.perspectiveLink) return true;
+    if (!obj._id || seen.has(obj._id)) return false;
+    seen.add(obj._id);
+
+    if (obj.endpointLinks) {
+      if (obj.endpointLinks.floatFree) return true;
+      if (isPerspectiveConstructionRef(obj.endpointLinks.start, seen)) return true;
+      if (isPerspectiveConstructionRef(obj.endpointLinks.end, seen)) return true;
+    }
+    return false;
+  }
+
+  function isPerspectiveConstructionRef(ref, seen = new Set()) {
+    if (!ref) return false;
+    if (ref.type === "perspectiveRay" || ref.type === "perspectivePoint") return true;
+    if (ref.type === "intersection") {
+      return isPerspectiveConstructionRef(ref.a, seen) || isPerspectiveConstructionRef(ref.b, seen);
+    }
+    if (ref.type === "segmentPoint") {
+      return isPerspectiveConstructionRef(ref.segment, seen);
+    }
+    if ((ref.type === "segment" || ref.type === "anchor") && ref.objId) {
+      const target = findObjById(ref.objId);
+      return isPerspectiveConstructionObject(target, seen);
+    }
+    return false;
+  }
+
+  function ensureFloatingFreeEnd(obj, linkedEnd, linkedPt) {
+    if (!obj || !obj.endpointLinks || !linkedPt) return null;
+    let f = obj.endpointLinks.floatFree;
+    if (!f || f.linkedEnd !== linkedEnd || !Number.isFinite(f.dx) || !Number.isFinite(f.dy)) {
+      if (linkedEnd === "start") {
+        f = { linkedEnd, dx: obj.x2 - linkedPt.x, dy: obj.y2 - linkedPt.y };
+      } else {
+        f = { linkedEnd, dx: obj.x1 - linkedPt.x, dy: obj.y1 - linkedPt.y };
+      }
+      obj.endpointLinks.floatFree = f;
+    }
+    return f;
+  }
+
+  function updateEndpointLinkedObject(obj) {
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow") || !obj.endpointLinks) return false;
+    if (obj.perspectiveLink && obj.endpointLinks.start && obj.endpointLinks.end) {
+      delete obj.perspectiveLink;
+    }
+    if (obj.perspectiveLink) return false;
+
+    let changed = false;
+    let start = resolveAnchorPoint(obj.endpointLinks.start);
+    let end = resolveAnchorPoint(obj.endpointLinks.end);
+
+    if (start) {
+      obj.endpointLinks.lastStart = { x: start.x, y: start.y };
+    } else if (obj.endpointLinks.lastStart && isPerspectiveConstructionRef(obj.endpointLinks.start)) {
+      start = { x: obj.endpointLinks.lastStart.x, y: obj.endpointLinks.lastStart.y };
+    }
+
+    if (end) {
+      obj.endpointLinks.lastEnd = { x: end.x, y: end.y };
+    } else if (obj.endpointLinks.lastEnd && isPerspectiveConstructionRef(obj.endpointLinks.end)) {
+      end = { x: obj.endpointLinks.lastEnd.x, y: obj.endpointLinks.lastEnd.y };
+    }
+
+    if (start && end) {
+      obj.x1 = start.x;
+      obj.y1 = start.y;
+      obj.x2 = end.x;
+      obj.y2 = end.y;
+      if (obj.endpointLinks.floatFree) delete obj.endpointLinks.floatFree;
+      return true;
+    }
+
+    if (start) {
+      const shouldFloatFreeEnd = isPerspectiveConstructionRef(obj.endpointLinks.start) || !!obj.endpointLinks.floatFree;
+      if (shouldFloatFreeEnd) {
+        const f = ensureFloatingFreeEnd(obj, "start", start);
+        obj.x1 = start.x;
+        obj.y1 = start.y;
+        if (f) {
+          obj.x2 = start.x + f.dx;
+          obj.y2 = start.y + f.dy;
+        }
+      } else {
+        obj.x1 = start.x;
+        obj.y1 = start.y;
+      }
+      changed = true;
+    }
+
+    if (end) {
+      const shouldFloatFreeEnd = isPerspectiveConstructionRef(obj.endpointLinks.end) || !!obj.endpointLinks.floatFree;
+      if (shouldFloatFreeEnd) {
+        const f = ensureFloatingFreeEnd(obj, "end", end);
+        obj.x2 = end.x;
+        obj.y2 = end.y;
+        if (f) {
+          obj.x1 = end.x + f.dx;
+          obj.y1 = end.y + f.dy;
+        }
+      } else {
+        obj.x2 = end.x;
+        obj.y2 = end.y;
+      }
+      changed = true;
+    }
+
+    if (!start && !end) {
+      // Keep construction references around briefly instead of dropping them at
+      // the first invalid intersection. This avoids the visible "jump then dead"
+      // failure when a moving VP passes through a near-parallel/near-tangent state.
+      if (!obj.endpointLinks.lastStart && !obj.endpointLinks.lastEnd) delete obj.endpointLinks;
+      return false;
+    }
+    return changed;
+  }
+
+  function updatePolyFillLinkedObject(obj) {
+    if (!obj || obj.kind !== "polyFill" || !Array.isArray(obj.pts) || !Array.isArray(obj.vertexLinks)) return false;
+    let changed = false;
+    if (!Array.isArray(obj.vertexLinkLast)) obj.vertexLinkLast = [];
+
+    for (let i = 0; i < obj.pts.length; i++) {
+      const ref = obj.vertexLinks[i];
+      if (!ref) continue;
+
+      if (obj._id && refDependsOnObject(ref, obj._id, new Set())) {
+        obj.vertexLinks[i] = null;
+        continue;
+      }
+
+      const p = resolveAnchorPoint(ref);
+      if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+        const cur = obj.pts[i] || { x: p.x, y: p.y };
+        if (Math.hypot(cur.x - p.x, cur.y - p.y) > 0.001) {
+          obj.pts[i] = { x: p.x, y: p.y };
+          changed = true;
+        }
+        obj.vertexLinkLast[i] = { x: p.x, y: p.y };
+      } else if (obj.vertexLinkLast[i]) {
+        const last = obj.vertexLinkLast[i];
+        const cur = obj.pts[i] || last;
+        if (Math.hypot(cur.x - last.x, cur.y - last.y) > 0.001) {
+          obj.pts[i] = { x: last.x, y: last.y };
+          changed = true;
+        }
+      }
+    }
+
+    if (!obj.vertexLinks.some(Boolean)) {
+      delete obj.vertexLinks;
+      delete obj.vertexLinkLast;
+    }
+    return changed;
+  }
+
+
+  function htmlEscape(str) {
+    return String(str ?? "").replace(/[&<>"']/g, ch => {
+      if (ch === "&") return "&amp;";
+      if (ch === "<") return "&lt;";
+      if (ch === ">") return "&gt;";
+      if (ch === "\"") return "&quot;";
+      return "&#39;";
+    });
+  }
+
+  function objectLabel(obj) {
+    if (!obj) return "missing";
+    const kind = obj.kind || "object";
+    const id = obj._id ? ` ${obj._id}` : "";
+    return `${kind}${id}`;
+  }
+
+  function shortRefLabel(ref) {
+    if (!ref) return "free";
+    if (ref.type === "anchor") {
+      const obj = findObjById(ref.objId);
+      const suffix = ref.kind === "lineEnd" ? (Number(ref.index) === 1 ? "end" : "start") : (ref.kind || "anchor");
+      return `${objectLabel(obj)} ${suffix}`;
+    }
+    if (ref.type === "intersection") return "intersection";
+    if (ref.type === "segmentPoint") return "line body";
+    if (ref.type === "perspectiveRay") return "perspective ray";
+    if (ref.type === "perspectivePoint") return `VP ${ref.name || ref.vpName || ""}`.trim();
+    if (ref.guideId && ref.vpName) return `${ref.vpName}`;
+    return ref.type || "link";
+  }
+
+  function pointForLinkRef(ref) {
+    if (!ref) return null;
+    if (ref.guideId && ref.vpName && !ref.type) return resolveVanishingPoint(ref);
+    if (ref.type === "perspectivePoint") return resolveVanishingPoint({ guideId: ref.guideId, vpName: ref.name || ref.vpName });
+    return resolveAnchorPoint(ref);
+  }
+
+  function linkStatus(ref, ownerObj) {
+    if (!ref) return { status: "free", cls: "linkInspector__free", label: "free", point: null };
+    const circular = ownerObj && ownerObj._id && refDependsOnObject(ref, ownerObj._id, new Set());
+    const point = pointForLinkRef(ref);
+    if (circular) return { status: "bad", cls: "linkInspector__bad", label: "circular link", point };
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return { status: "bad", cls: "linkInspector__bad", label: "broken", point: null };
+    return { status: "ok", cls: "linkInspector__ok", label: "linked", point };
+  }
+
+  function pushDebugPoint(items, point, status, label, ref) {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    items.push({ kind: "point", x: point.x, y: point.y, status, label, ref: ref ? cloneRef(ref) : null });
+  }
+
+  function pushDebugBox(items, obj, status, label) {
+    if (!obj) return;
+    const b = objectBounds(obj);
+    if (!b || ![b.minX, b.minY, b.maxX, b.maxY].every(Number.isFinite)) return;
+    items.push({ kind: "box", minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY, status, label });
+  }
+
+  function lineEndpointRows(obj, rows, debugItems) {
+    const startRef = obj.endpointLinks?.start || null;
+    const endRef = obj.endpointLinks?.end || null;
+    const start = linkStatus(startRef, obj);
+    const end = linkStatus(endRef, obj);
+    const startPt = start.point || { x: obj.x1, y: obj.y1 };
+    const endPt = end.point || { x: obj.x2, y: obj.y2 };
+    rows.push(["Start", `<span class="${start.cls}">${start.label}</span> <span class="linkInspector__muted">${htmlEscape(shortRefLabel(startRef))}</span>`]);
+    rows.push(["End", `<span class="${end.cls}">${end.label}</span> <span class="linkInspector__muted">${htmlEscape(shortRefLabel(endRef))}</span>`]);
+    pushDebugPoint(debugItems, startPt, start.status, "start", startRef);
+    pushDebugPoint(debugItems, endPt, end.status, "end", endRef);
+    if (obj.endpointLinks?.floatFree) rows.push(["Float", `<span class="linkInspector__ok">free end travels with linked end</span>`]);
+  }
+
+  function perspectiveLineRows(obj, rows, debugItems) {
+    const a = linkStatus(obj.perspectiveLink?.anchor, obj);
+    const vp = linkStatus(obj.perspectiveLink?.vp, obj);
+    rows.push(["Source", `<span class="${a.cls}">${a.label}</span> <span class="linkInspector__muted">${htmlEscape(shortRefLabel(obj.perspectiveLink?.anchor))}</span>`]);
+    rows.push(["VP", `<span class="${vp.cls}">${vp.label}</span> <span class="linkInspector__muted">${htmlEscape(shortRefLabel(obj.perspectiveLink?.vp))}</span>`]);
+    rows.push(["Mode", htmlEscape(obj.perspectiveLink?.endMode || "length")]);
+    pushDebugPoint(debugItems, a.point || { x: obj.x1, y: obj.y1 }, a.status, "source", obj.perspectiveLink?.anchor);
+    pushDebugPoint(debugItems, vp.point || { x: obj.x2, y: obj.y2 }, vp.status, "VP", obj.perspectiveLink?.vp);
+    pushDebugPoint(debugItems, { x: obj.x2, y: obj.y2 }, "ok", "line end", null);
+  }
+
+  function polyFillRows(obj, rows, debugItems) {
+    const pts = obj.pts || [];
+    const links = obj.vertexLinks || [];
+    let linked = 0, free = 0, bad = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const ref = links[i] || null;
+      const st = linkStatus(ref, obj);
+      if (st.status === "ok") linked++;
+      else if (st.status === "bad") bad++;
+      else free++;
+      pushDebugPoint(debugItems, st.point || pts[i], st.status, `P${i + 1}`, ref);
+    }
+    rows.push(["Corners", `${pts.length}`]);
+    rows.push(["Linked", `<span class="linkInspector__ok">${linked}</span> <span class="linkInspector__free">${free} free</span> ${bad ? `<span class="linkInspector__bad">${bad} broken</span>` : ""}`]);
+  }
+
+  function guideRows(obj, rows, debugItems) {
+    const target = findObjById(obj.targetId);
+    rows.push(["Source", target ? `<span class="linkInspector__ok">found</span> <span class="linkInspector__muted">${htmlEscape(objectLabel(target))}</span>` : `<span class="linkInspector__bad">missing</span>`]);
+    if (target) pushDebugBox(debugItems, target, "source", "SOURCE");
+    if (obj.vp1) pushDebugPoint(debugItems, obj.vp1, "ok", "VP1", { type: "perspectivePoint", guideId: obj._id, name: "vp1" });
+    if ((obj.mode || 1) >= 2 && obj.vp2) pushDebugPoint(debugItems, obj.vp2, "ok", "VP2", { type: "perspectivePoint", guideId: obj._id, name: "vp2" });
+    const dependentLines = state.objects.filter(o => o && (o.kind === "line" || o.kind === "arrow") && (o.perspectiveLink?.vp?.guideId === obj._id || isPerspectiveConstructionRef(o.endpointLinks?.start) || isPerspectiveConstructionRef(o.endpointLinks?.end))).length;
+    const dependentFaces = state.objects.filter(o => o && o.kind === "polyFill" && Array.isArray(o.vertexLinks) && o.vertexLinks.some(Boolean)).length;
+    rows.push(["Group", `${dependentLines} lines, ${dependentFaces} faces`]);
+  }
+
+  function selectedSourceGuideRows(obj, rows, debugItems) {
+    if (!obj?._id) return;
+    const guides = state.objects.filter(o => o && o.kind === "perspectiveGuide" && o.targetId === obj._id);
+    if (!guides.length) return;
+    rows.push(["Guides", guides.map(g => htmlEscape(`${g.mode >= 2 ? "2P" : "1P"} ${g._id || ""}`)).join(", ")]);
+    for (const g of guides) pushDebugBox(debugItems, g, "ok", g.mode >= 2 ? "2P" : "1P");
+  }
+
+  function buildLinkInspectorData() {
+    const obj = state.selectionIndex >= 0 ? state.objects[state.selectionIndex] : null;
+    const rows = [];
+    const debugItems = [];
+    if (!obj) return { obj: null, rows, debugItems };
+    ensureObjId(obj);
+    rows.push(["Object", htmlEscape(objectLabel(obj))]);
+
+    if ((obj.kind === "line" || obj.kind === "arrow") && obj.perspectiveLink) {
+      perspectiveLineRows(obj, rows, debugItems);
+    } else if (obj.kind === "line" || obj.kind === "arrow") {
+      lineEndpointRows(obj, rows, debugItems);
+    } else if (obj.kind === "polyFill") {
+      polyFillRows(obj, rows, debugItems);
+    } else if (obj.kind === "perspectiveGuide") {
+      guideRows(obj, rows, debugItems);
+    } else {
+      selectedSourceGuideRows(obj, rows, debugItems);
+      if (rows.length === 1) rows.push(["Links", `<span class="linkInspector__muted">No direct links on this object</span>`]);
+    }
+    return { obj, rows, debugItems };
+  }
+
+  function renderLinkInspector() {
+    if (!linkInspector || !linkInspectorBody) return;
+    const { obj, rows } = buildLinkInspectorData();
+    if (!obj || state.tool !== "select") {
+      linkInspector.classList.add("is-hidden");
+      linkDebugOverlay.visible = false;
+      linkDebugOverlay.items = [];
+      linkDebugOverlay.targetId = null;
+      return;
+    }
+    if (linkDebugOverlay.visible && linkDebugOverlay.targetId && linkDebugOverlay.targetId !== obj._id) {
+      linkDebugOverlay.visible = false;
+      linkDebugOverlay.items = [];
+      linkDebugOverlay.targetId = null;
+    }
+    linkInspector.classList.remove("is-hidden");
+    linkInspectorBody.innerHTML = rows.map(([label, value]) => `<div class="linkInspector__row"><div class="linkInspector__label">${htmlEscape(label)}</div><div>${value}</div></div>`).join("");
+  }
+
+  function checkSelectedLinks(showToastMessage = true) {
+    const data = buildLinkInspectorData();
+    linkDebugOverlay.items = data.debugItems;
+    linkDebugOverlay.visible = !!data.obj && data.debugItems.length > 0;
+    linkDebugOverlay.targetId = data.obj?._id || null;
+    linkDebugOverlay.lastCheckAt = Date.now();
+    renderLinkInspector();
+    redrawAllRaw();
+    drawLinkDebugOverlay();
+    if (showToastMessage) showToast(data.obj ? "Checked links: green linked, orange free, red broken, blue source/VP" : "Select an object to inspect");
+  }
+
+  function repairSelectedLinks() {
+    const obj = state.selectionIndex >= 0 ? state.objects[state.selectionIndex] : null;
+    if (!obj) {
+      showToast("Select a linked object to repair");
+      return;
+    }
+    state.undo.push(JSON.stringify(snapshot()));
+    state.redo.length = 0;
+    let changed = 0;
+    ensureObjId(obj);
+
+    if ((obj.kind === "line" || obj.kind === "arrow") && !obj.perspectiveLink) {
+      const rawStart = findBestLinkRefAtPoint({ x: obj.x1, y: obj.y1 }, obj._id);
+      const rawEnd = findBestLinkRefAtPoint({ x: obj.x2, y: obj.y2 }, obj._id);
+      const start = rawStart && !refDependsOnObject(rawStart, obj._id, new Set()) ? rawStart : null;
+      const end = rawEnd && !refDependsOnObject(rawEnd, obj._id, new Set()) ? rawEnd : null;
+      if (start) { setEndpointLink(obj, "start", start); changed++; }
+      else if (obj.endpointLinks?.start && !pointForLinkRef(obj.endpointLinks.start)) { delete obj.endpointLinks.start; changed++; }
+      if (end) { setEndpointLink(obj, "end", end); changed++; }
+      else if (obj.endpointLinks?.end && !pointForLinkRef(obj.endpointLinks.end)) { delete obj.endpointLinks.end; changed++; }
+      if (obj.endpointLinks && !obj.endpointLinks.start && !obj.endpointLinks.end) delete obj.endpointLinks;
+      updateEndpointLinkedObject(obj);
+    }
+
+    if ((obj.kind === "line" || obj.kind === "arrow") && obj.perspectiveLink) {
+      const a = linkStatus(obj.perspectiveLink.anchor, obj);
+      const v = linkStatus(obj.perspectiveLink.vp, obj);
+      if (a.status === "bad") {
+        const near = findBestLinkRefAtPoint({ x: obj.x1, y: obj.y1 }, obj._id);
+        if (near && !refDependsOnObject(near, obj._id, new Set())) { obj.perspectiveLink.anchor = near; changed++; }
+      }
+      if (v.status === "bad") changed += 0;
+      updatePerspectiveLinkedObject(obj);
+    }
+
+    if (obj.kind === "polyFill" && Array.isArray(obj.pts)) {
+      if (!obj.vertexLinks) obj.vertexLinks = [];
+      for (let i = 0; i < obj.pts.length; i++) {
+        const p = obj.pts[i];
+        const current = obj.vertexLinks[i];
+        const st = linkStatus(current, obj);
+        const near = findBestLinkRefAtPoint(p, obj._id);
+        if (near && !refDependsOnObject(near, obj._id, new Set())) {
+          const before = JSON.stringify(current || null);
+          if (before !== JSON.stringify(near)) { obj.vertexLinks[i] = near; changed++; }
+        } else if (current && st.status === "bad") {
+          obj.vertexLinks[i] = null;
+          changed++;
+        }
+      }
+      if (!obj.vertexLinks.some(Boolean)) delete obj.vertexLinks;
+      updatePolyFillLinkedObject(obj);
+    }
+
+    if (obj.kind === "perspectiveGuide") {
+      const target = findObjById(obj.targetId);
+      if (!target) showToast("Perspective guide source is missing — select a shape and make a new guide");
+    }
+
+    updatePerspectiveLinks();
+    renderLinkInspector();
+    checkSelectedLinks(false);
+    showToast(changed ? `Repaired ${changed} link${changed === 1 ? "" : "s"}` : "No nearby repairs found");
+  }
+
+  function drawLinkDebugOverlay() {
+    if (!linkDebugOverlay.visible || !linkDebugOverlay.items.length) return;
+    const pr = state.pixelRatio || 1;
+    uiCtx.save();
+    uiCtx.setTransform(pr, 0, 0, pr, 0, 0);
+    uiCtx.font = "700 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    uiCtx.textBaseline = "middle";
+    for (const item of linkDebugOverlay.items) {
+      const status = item.status || "ok";
+      const color = status === "bad" ? "#c62828" : status === "free" ? "#f57c00" : status === "source" ? "#1976d2" : "#1b8f3a";
+      if (item.kind === "box") {
+        const a = worldToScreen(item.minX, item.minY);
+        const b = worldToScreen(item.maxX, item.maxY);
+        const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+        uiCtx.save();
+        uiCtx.setLineDash([8, 5]);
+        uiCtx.strokeStyle = color;
+        uiCtx.fillStyle = color + "22";
+        uiCtx.lineWidth = 3;
+        uiCtx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+        uiCtx.fillRect(x - 5, y - 5, w + 10, h + 10);
+        uiCtx.setLineDash([]);
+        uiCtx.restore();
+        continue;
+      }
+      const p = worldToScreen(item.x, item.y);
+      uiCtx.fillStyle = "rgba(255,255,255,0.96)";
+      uiCtx.strokeStyle = color;
+      uiCtx.lineWidth = 3;
+      uiCtx.beginPath();
+      uiCtx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+      uiCtx.fill();
+      uiCtx.stroke();
+      if (item.label) {
+        const text = item.label;
+        const tw = uiCtx.measureText(text).width;
+        uiCtx.fillStyle = color;
+        uiCtx.fillRect(p.x + 10, p.y - 10, tw + 10, 18);
+        uiCtx.fillStyle = "white";
+        uiCtx.fillText(text, p.x + 15, p.y - 1);
+      }
+    }
+    uiCtx.restore();
+  }
+
+  function updatePerspectiveLinks() {
+    // A few light passes let normal snapped connectors follow perspective-linked lines.
+    // Remove accidental circular endpoint links first; these were the main cause of
+    // construction lines suddenly jumping to unrelated page positions after several moves.
+    for (const obj of state.objects) sanitizeEndpointLinkCycles(obj);
+    for (let pass = 0; pass < 4; pass++) {
+      for (const obj of state.objects) updatePerspectiveLinkedObject(obj);
+      for (const obj of state.objects) updateEndpointLinkedObject(obj);
+      for (const obj of state.objects) updatePolyFillLinkedObject(obj);
+    }
+  }
 
   const render = window.WBRender.createRenderApi({
     state,
@@ -678,14 +2135,30 @@ state.selection = [];
     polyDraft,
     dpr,
     uiHandles,
-    getLineDash
+    getLineDash,
+    findObjById,
+    perspectiveTargetPoints
   });
 
   const {
     applyBgTransform,
-    resizeAll,
-    redrawAll
+    resizeAll: resizeAllRaw,
+    redrawAll: redrawAllRaw
   } = render;
+
+  function redrawAll() {
+    updatePerspectiveLinks();
+    redrawAllRaw();
+    renderLinkInspector();
+    if (linkDebugOverlay.visible) drawLinkDebugOverlay();
+  }
+
+  function resizeAll() {
+    updatePerspectiveLinks();
+    resizeAllRaw();
+    renderLinkInspector();
+    if (linkDebugOverlay.visible) drawLinkDebugOverlay();
+  }
 
   const ui = window.WBUI.createUIApi({
     state,
@@ -768,6 +2241,7 @@ state.selection = [];
     screenToWorld,
     pointOnArc,
     rectEdges,
+    perspectiveTargetPoints,
     exportWorldBounds,
     ensureObjId,
     findObjById,
@@ -800,6 +2274,7 @@ state.selection = [];
   function cancelPolyDraft() {
     polyDraft.active = false;
     polyDraft.pts = [];
+    polyDraft.links = [];
     polyDraft.hover = null;
   }
 
@@ -827,6 +2302,11 @@ state.selection = [];
     gesture.arcAccum = 0;
 
     gesture.snapCache = null;
+    gesture.perspectivePointName = null;
+    gesture.lineAnchorRef = null;
+    gesture.lineEndAnchorRef = null;
+    gesture.lineResizeEnd = null;
+    gesture.forceLinkActive = false;
     gesture.lastScreenPrev = null;
 
     lenEntry.open = false;
@@ -947,7 +2427,8 @@ function applyStyleToSelectionLive(patch = {}) {
       obj.kind === "arrow" ||
       obj.kind === "arc" ||
       obj.kind === "rect" ||
-      obj.kind === "circle"
+      obj.kind === "circle" ||
+      obj.kind === "curve"
     ) {
       obj.lineStyle = patch.lineStyle;
     }
@@ -956,6 +2437,141 @@ function applyStyleToSelectionLive(patch = {}) {
   redrawAll();
   return true;
 }
+
+  /* =========================
+     Hide / unhide visibility
+  ========================= */
+  function revealLabel() {
+    return svgReveal.groupId === MANUAL_HIDDEN_REVEAL_GROUP ? "Hidden" : "SVG";
+  }
+
+  function hiddenObjectIds() {
+    return state.objects.filter(o => o && o.hidden && o._id).map(o => o._id);
+  }
+
+  function visibleObjectIds() {
+    return state.objects.filter(o => o && !o.hidden && o._id).map(o => o._id);
+  }
+
+  function rebuildManualHiddenRevealList(extraIds = []) {
+    const existing = svgReveal.groupId === MANUAL_HIDDEN_REVEAL_GROUP && Array.isArray(svgReveal.partIds)
+      ? new Set(svgReveal.partIds)
+      : new Set();
+    for (const id of extraIds || []) if (id) existing.add(id);
+
+    const ids = [];
+    for (const obj of state.objects) {
+      if (!obj || !obj._id) continue;
+      if (obj.hidden || existing.has(obj._id)) ids.push(obj._id);
+    }
+
+    svgReveal.active = ids.length > 0;
+    svgReveal.groupId = ids.length ? MANUAL_HIDDEN_REVEAL_GROUP : null;
+    svgReveal.partIds = ids;
+    syncSvgRevealCountFromVisibility();
+    return ids.length > 0;
+  }
+
+  function ensureVisibilityRevealFromHidden(showMessage = false) {
+    if (svgReveal.active && Array.isArray(svgReveal.partIds) && svgReveal.partIds.length) return true;
+
+    const hiddenIds = hiddenObjectIds();
+    if (!hiddenIds.length) {
+      if (showMessage) showToast("No hidden objects to cycle");
+      return false;
+    }
+
+    svgReveal.active = true;
+    svgReveal.groupId = MANUAL_HIDDEN_REVEAL_GROUP;
+    svgReveal.partIds = hiddenIds;
+    svgReveal.revealed = 0;
+    if (showMessage) showToast(`Hidden: 0/${hiddenIds.length}`);
+    return true;
+  }
+
+  function syncSvgRevealCountFromVisibility() {
+    if (!svgReveal.active || !Array.isArray(svgReveal.partIds) || !svgReveal.partIds.length) return;
+    let shown = 0;
+    for (const id of svgReveal.partIds) {
+      const obj = findObjById(id);
+      if (obj && !obj.hidden) shown += 1;
+    }
+    svgReveal.revealed = clamp(shown, 0, svgReveal.partIds.length);
+  }
+
+  function hideSelectedObjects() {
+    const indices = (state.selection && state.selection.length ? state.selection : (state.selectionIndex >= 0 ? [state.selectionIndex] : []))
+      .filter(i => state.objects[i] && !state.objects[i].hidden);
+
+    if (!indices.length) {
+      for (let i = 0; i < state.objects.length; i += 1) {
+        if (state.objects[i] && !state.objects[i].hidden) indices.push(i);
+      }
+      if (!indices.length) {
+        showToast("Nothing visible to hide");
+        return false;
+      }
+    }
+
+    state.undo.push(JSON.stringify(snapshot()));
+    state.redo.length = 0;
+
+    const hiddenIds = [];
+    for (const i of indices) {
+      state.objects[i].hidden = true;
+      if (state.objects[i]._id) hiddenIds.push(state.objects[i]._id);
+    }
+
+    if (!svgReveal.active || svgReveal.groupId === MANUAL_HIDDEN_REVEAL_GROUP) {
+      rebuildManualHiddenRevealList(hiddenIds);
+    } else {
+      syncSvgRevealCountFromVisibility();
+    }
+
+    state.selection = [];
+    state.selectionIndex = -1;
+    hardResetGesture();
+    redrawAll();
+    showToast(indices.length === 1 ? "Hidden — use ▶ / . to reveal" : `${indices.length} objects hidden — use ▶ / . to reveal`);
+    return true;
+  }
+
+  function unhideAllObjects() {
+    const hidden = state.objects.filter(o => o && o.hidden);
+    if (!hidden.length) {
+      showToast("Nothing hidden");
+      return false;
+    }
+
+    state.undo.push(JSON.stringify(snapshot()));
+    state.redo.length = 0;
+
+    hidden.forEach(o => { o.hidden = false; });
+    syncSvgRevealCountFromVisibility();
+    redrawAll();
+    showToast(hidden.length === 1 ? "Unhidden" : `${hidden.length} objects unhidden`);
+    return true;
+  }
+
+  function revealNextStep() {
+    if (!ensureVisibilityRevealFromHidden(true)) return false;
+    if (svgPlayback.running) stopSvgPlayback(true);
+    const total = svgReveal.partIds.length;
+    if (!total) return false;
+    const moved = revealNextSvgPart();
+    showToast(`${revealLabel()}: ${Math.min(svgReveal.revealed, total)}/${total}`);
+    return moved;
+  }
+
+  function revealPrevStep() {
+    if (!ensureVisibilityRevealFromHidden(true)) return false;
+    if (svgPlayback.running) stopSvgPlayback(true);
+    const total = svgReveal.partIds.length;
+    if (!total) return false;
+    const moved = hidePrevSvgPart();
+    showToast(`${revealLabel()}: ${Math.max(svgReveal.revealed, 0)}/${total}`);
+    return moved;
+  }
 
   /* =========================
      SVG playback
@@ -1045,7 +2661,7 @@ function applyStyleToSelectionLive(patch = {}) {
 
     if (!svgReveal.active || !svgReveal.partIds.length) {
       stopSvgPlayback(true);
-      showToast("No SVG reveal loaded");
+      showToast("No reveal list loaded");
       return;
     }
 
@@ -1063,8 +2679,10 @@ function applyStyleToSelectionLive(patch = {}) {
 
   function startSvgPlayback() {
     if (!svgReveal.active || !svgReveal.partIds.length) {
-      showToast("Import SVG reveal first");
-      return;
+      if (!ensureVisibilityRevealFromHidden(false)) {
+        showToast("Import SVG or hide objects first");
+        return;
+      }
     }
 
     stopSvgPlayback(true);
@@ -1079,7 +2697,7 @@ function applyStyleToSelectionLive(patch = {}) {
       firstDelay = svgPlayback.stepMs;
     }
 
-    showToast(`Presentation ▶ ${svgReveal.revealed}/${total}`);
+    showToast(`${revealLabel()} ▶ ${svgReveal.revealed}/${total}`);
     scheduleSvgPlayback(firstDelay, token, () => svgPlaybackTick(token));
   }
 
@@ -1118,9 +2736,37 @@ function applyStyleToSelectionLive(patch = {}) {
   ========================= */
 
    
-  function beginSelectionTransform(kind, w) {
+  function beginSelectionTransform(kind, w, detail) {
     const idx = state.selectionIndex;
     if (idx < 0) return false;
+
+    if (kind === "perspectiveSource") {
+      const guide = state.objects[idx];
+      const targetIndex = findObjIndexById((detail && detail.targetId) || guide?.targetId);
+      if (targetIndex < 0) {
+        showToast("Perspective source not found");
+        return false;
+      }
+
+      state.undo.push(JSON.stringify(snapshot()));
+      state.redo.length = 0;
+
+      state.selectionIndex = targetIndex;
+      state.selection = [targetIndex];
+      syncStyleControlsFromSelection();
+
+      gesture.selIndex = targetIndex;
+      gesture.selStartObj = deepClone(state.objects[targetIndex]);
+      const sourceBounds = objectBounds(state.objects[targetIndex]);
+      gesture.selAnchor = {
+        x: (sourceBounds.minX + sourceBounds.maxX) / 2,
+        y: (sourceBounds.minY + sourceBounds.maxY) / 2
+      };
+      gesture.mode = "selMove";
+      gesture.startWorld = w;
+      showToast("Source object selected — drag to move it with the perspective lines");
+      return true;
+    }
 
     state.undo.push(JSON.stringify(snapshot()));
     state.redo.length = 0;
@@ -1132,6 +2778,26 @@ function applyStyleToSelectionLive(patch = {}) {
     const cx = (b.minX + b.maxX) / 2;
     const cy = (b.minY + b.maxY) / 2;
     gesture.selAnchor = { x: cx, y: cy };
+
+    if (kind === "perspectivePoint") {
+      gesture.mode = "perspectivePoint";
+      gesture.perspectivePointName = detail || null;
+      gesture.perspectivePointCluster = collectSharedPerspectivePointStarts(idx, detail || null);
+      gesture.startWorld = w;
+      gesture.snapCache = buildSnapCache(state.objects[idx]?._id);
+      return true;
+    }
+
+    if (kind === "lineEnd") {
+      const obj = state.objects[idx];
+      if (!obj || (obj.kind !== "line" && obj.kind !== "arrow")) return false;
+      gesture.mode = "lineEndResize";
+      gesture.lineResizeEnd = detail && detail.endName ? detail.endName : "end";
+      gesture.startWorld = w;
+      gesture.snapCache = buildSnapCache(obj._id);
+      showToast(gesture.lineResizeEnd === "start" ? "Drag line start" : "Drag line end");
+      return true;
+    }
 
     if (kind === "move") {
       gesture.mode = "selMove";
@@ -1189,25 +2855,43 @@ function applyStyleToSelectionLive(patch = {}) {
   /* =========================
      PolyFill commit
   ========================= */
+function polygonAreaAbs(pts) {
+  if (!pts || pts.length < 3) return 0;
+  let sum = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    sum += (pts[j].x * pts[i].y) - (pts[i].x * pts[j].y);
+  }
+  return Math.abs(sum / 2);
+}
+
 function commitPolyFill() {
   const pts = polyDraft.pts || [];
   if (pts.length < 3) {
-    showToast("Need 3+ points");
+    showToast(`PolyFill needs 3+ corners. You have ${pts.length}; click more points, then Enter/double-click/right-click.`);
+    return false;
+  }
+
+  const area = polygonAreaAbs(pts);
+  if (area < 4) {
+    showToast("PolyFill needs a real area — these points are too close together or nearly flat.");
     return false;
   }
 
   state.undo.push(JSON.stringify(snapshot()));
   state.redo.length = 0;
 
+  const links = (polyDraft.links || []).map(link => link ? cloneRef(link) : null);
   const obj = {
     kind: "polyFill",
-    pts: pts.slice(),
+    pts: pts.map(pt => ({ x: pt.x, y: pt.y })),
+    ...(links.some(Boolean) ? { vertexLinks: links } : {}),
     fill: state.color,
     opacity: clamp(state.opacity ?? 1, 0, 1),
     hidden: false
   };
   ensureObjId(obj);
 
+  let hiddenInReveal = false;
   if (svgReveal.active && svgReveal.groupId) {
     obj.svgGroupId = svgReveal.groupId;
 
@@ -1218,6 +2902,7 @@ function commitPolyFill() {
     // do NOT advance revealed count
     // do NOT force it immediately into the already-revealed set
     obj.hidden = true;
+    hiddenInReveal = true;
   }
 
   // keep fills visually underneath outlines
@@ -1227,38 +2912,125 @@ state.objects.push(obj);
    
   cancelPolyDraft();
   redrawAll();
-  showToast("Poly filled");
+  const colourNote = (String(obj.fill || "").toLowerCase() === "#ffffff" || String(obj.fill || "").toLowerCase() === "white") ? " It is white, so it may be hard to see." : "";
+  const opacityNote = (obj.opacity ?? 1) < 0.12 ? " Opacity is very low." : "";
+  showToast(hiddenInReveal ? "PolyFill added to the next SVG reveal step, so it is hidden for now." : `Poly filled.${colourNote}${opacityNote}`);
   return true;
-}  /* =========================
+}
+
+function commitSmoothCurve() {
+  const pts = polyDraft.pts || [];
+  if (pts.length < 2) {
+    showToast(`Smooth curve needs 2+ points. You have ${pts.length}; click more points, then Enter/double-click/right-click.`);
+    return false;
+  }
+
+  state.undo.push(JSON.stringify(snapshot()));
+  state.redo.length = 0;
+
+  const obj = {
+    kind: "curve",
+    color: state.color,
+    size: state.size,
+    opacity: state.opacity,
+    lineStyle: state.lineStyle || "solid",
+    points: pts.map(pt => ({ x: pt.x, y: pt.y }))
+  };
+  ensureObjId(obj);
+  state.objects.push(obj);
+  cancelPolyDraft();
+  redrawAll();
+  showToast("Smooth curve added");
+  return true;
+}
+
+  /* =========================
      Numeric setters
   ========================= */
-  function setActiveLineLengthMm(mm) {
-    if (!gesture.activeObj) return false;
-    const obj = gesture.activeObj;
-    if (!(obj.kind === "line" || obj.kind === "arrow")) return false;
+  function linkedBaseEndForLength(obj) {
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow")) return null;
+    // Perspective lines are always measured outward from their source/anchor joint.
+    if (obj.perspectiveLink) return "start";
+    // A snapped joint is the base. Preserve it even if the cursor or resize handle is elsewhere.
+    if (obj.endpointLinks?.start) return "start";
+    if (obj.endpointLinks?.end) return "end";
+    // While drawing from a snapped joint the link may still only live on the gesture.
+    if (gesture.lineAnchorRef) return "start";
+    return null;
+  }
+
+  function setLineLengthMmForObject(obj, mm, fixedEnd = "start") {
+    if (!(obj && (obj.kind === "line" || obj.kind === "arrow"))) return false;
 
     const ppm = pxPerMm();
-    const lenPx = mm * ppm;
+    const lenPx = Math.max(0.001, mm * ppm);
 
-    const x1 = obj.x1, y1 = obj.y1;
-    let dx = (obj.x2 ?? x1) - x1;
-    let dy = (obj.y2 ?? y1) - y1;
+    // For perspective-linked lines, do not use the current cursor direction.
+    // The line must stay on its VP ray and simply change its distance from the source joint.
+    if (obj.perspectiveLink && fixedEnd === "start") {
+      const anchor = resolveAnchorPoint(obj.perspectiveLink.anchor) || { x: obj.x1, y: obj.y1 };
+      const vp = resolveVanishingPoint(obj.perspectiveLink.vp);
+      if (anchor && vp) {
+        obj.x1 = anchor.x;
+        obj.y1 = anchor.y;
+        const lenToVp = Math.hypot(vp.x - anchor.x, vp.y - anchor.y) || 1;
+        obj.perspectiveLink.endMode = "length";
+        obj.perspectiveLink.lengthWorld = lenPx;
+        obj.perspectiveLink.rayT = Math.max(0.001, lenPx / lenToVp);
+        updatePerspectiveLinkedObject(obj);
+        redrawAll();
+        return true;
+      }
+    }
+
+    const anchorX = fixedEnd === "end" ? obj.x2 : obj.x1;
+    const anchorY = fixedEnd === "end" ? obj.y2 : obj.y1;
+    let dx = fixedEnd === "end" ? (obj.x1 ?? anchorX) - anchorX : (obj.x2 ?? anchorX) - anchorX;
+    let dy = fixedEnd === "end" ? (obj.y1 ?? anchorY) - anchorY : (obj.y2 ?? anchorY) - anchorY;
 
     let d = Math.hypot(dx, dy);
     if (!isFinite(d) || d < 1e-6) {
-      dx = 1; dy = 0; d = 1;
+      dx = fixedEnd === "end" ? -1 : 1;
+      dy = 0;
+      d = 1;
     }
 
     const ux = dx / d, uy = dy / d;
-    obj.x2 = x1 + ux * lenPx;
-    obj.y2 = y1 + uy * lenPx;
+    let next = { x: anchorX + ux * lenPx, y: anchorY + uy * lenPx };
+    next = snapToWholeMmLength({ x: anchorX, y: anchorY }, next);
 
-    const snapped = snapToWholeMmLength({ x: x1, y: y1 }, { x: obj.x2, y: obj.y2 });
-    obj.x2 = snapped.x;
-    obj.y2 = snapped.y;
+    if (fixedEnd === "end") {
+      obj.x1 = next.x;
+      obj.y1 = next.y;
+      if (obj.perspectiveLink) delete obj.perspectiveLink;
+    } else {
+      obj.x2 = next.x;
+      obj.y2 = next.y;
+    }
 
     redrawAll();
     return true;
+  }
+
+  function setActiveLineLengthMm(mm, fixedEnd = null) {
+    const selectedObj = state.selectionIndex >= 0 ? state.objects[state.selectionIndex] : null;
+    const selectedFromMulti = (state.selection && state.selection.length)
+      ? state.objects[state.selection[state.selection.length - 1]]
+      : null;
+    const obj = gesture.activeObj || selectedObj || selectedFromMulti;
+    if (!obj || (obj.kind !== "line" && obj.kind !== "arrow")) return false;
+
+    // fixedEnd means the end that stays put while the other endpoint moves.
+    // Linked joints win over cursor position and handle direction.
+    if (!fixedEnd) fixedEnd = linkedBaseEndForLength(obj);
+    if (!fixedEnd) {
+      if (gesture.mode === "lineEndResize") {
+        fixedEnd = (gesture.lineResizeEnd === "start") ? "end" : "start";
+      } else {
+        fixedEnd = "start";
+      }
+    }
+    return setLineLengthMmForObject(obj, mm, fixedEnd) ? true : false;
   }
 
   function setActiveArcRadiusMm(mm) {
@@ -1293,8 +3065,12 @@ state.objects.push(obj);
       inkCanvas.style.cursor = "grab";
       return;
     }
-    if (h.kind === "move") {
+    if (h.kind === "move" || h.kind === "perspectiveSource") {
       inkCanvas.style.cursor = "move";
+      return;
+    }
+    if (h.kind === "lineEnd") {
+      inkCanvas.style.cursor = "crosshair";
       return;
     }
     inkCanvas.style.cursor = h.corner === "nw" || h.corner === "se" ? "nwse-resize" : "nesw-resize";
@@ -1303,15 +3079,27 @@ state.objects.push(obj);
 function onCanvasContextMenu(e) {
   if (!inkCanvas.contains(e.target)) return;
 
-  if (state.tool === "polyFill" && polyDraft.active) {
+  if ((state.tool === "polyFill" || state.tool === "curve") && polyDraft.active) {
     e.preventDefault();
+
+    if (state.tool === "curve") {
+      if (polyDraft.pts.length >= 2) commitSmoothCurve();
+      else {
+        const count = polyDraft.pts.length;
+        cancelPolyDraft();
+        redrawAll();
+        showToast(count ? `Smooth curve cancelled — needs 2+ points, had ${count}.` : "Smooth curve cancelled");
+      }
+      return;
+    }
 
     if (polyDraft.pts.length >= 3) {
       commitPolyFill();                   // same result as Enter
     } else {
+      const count = polyDraft.pts.length;
       cancelPolyDraft();
       redrawAll();
-      showToast("PolyFill cancelled");
+      showToast(count ? `PolyFill cancelled — needs 3+ corners, had ${count}.` : "PolyFill cancelled");
     }
     return;
   }
@@ -1340,6 +3128,122 @@ function onCanvasContextMenu(e) {
     }
   }
 }
+
+
+
+  function perspectivePointWorldTolerance() {
+    try {
+      const a = screenToWorld(0, 0);
+      const b = screenToWorld(14, 0);
+      const d = Math.abs((b && b.x || 0) - (a && a.x || 0));
+      return Math.max(6, d || 6);
+    } catch {
+      return 10;
+    }
+  }
+
+  function collectSharedPerspectivePointStarts(mainIndex, pointName) {
+    const guide = state.objects[mainIndex];
+    if (!guide || guide.kind !== "perspectiveGuide" || !pointName || !guide[pointName]) return [];
+    const base = guide[pointName];
+    const tol = perspectivePointWorldTolerance();
+    const out = [];
+    for (let i = 0; i < state.objects.length; i++) {
+      const g = state.objects[i];
+      if (!g || g.kind !== "perspectiveGuide") continue;
+      for (const name of ["vp1", "vp2"]) {
+        if (!g[name]) continue;
+        if (Math.hypot(g[name].x - base.x, g[name].y - base.y) <= tol) {
+          out.push({ index: i, name, startObj: deepClone(g) });
+        }
+      }
+    }
+    return out;
+  }
+
+  function findExistingPerspectiveGuideForTarget(targetId, mode) {
+    if (!targetId) return -1;
+    let fallback = -1;
+    for (let i = state.objects.length - 1; i >= 0; i--) {
+      const g = state.objects[i];
+      if (!g || g.kind !== "perspectiveGuide" || g.targetId !== targetId) continue;
+      if ((g.mode || 1) >= mode) return i;
+      if (fallback < 0) fallback = i;
+    }
+    return fallback;
+  }
+
+  function createPerspectiveGuide(mode) {
+    const idx = state.selectionIndex;
+    const target = idx >= 0 ? state.objects[idx] : null;
+
+    if (!target || target.kind === "perspectiveGuide" || target.kind === "erase") {
+      showToast("Click the shape/line you want to use as the perspective source.");
+      return false;
+    }
+
+    const targetId = ensureObjId(target);
+
+    const existingIndex = findExistingPerspectiveGuideForTarget(targetId, mode);
+    if (existingIndex >= 0) {
+      const existing = state.objects[existingIndex];
+      if (existing && existing.kind === "perspectiveGuide") {
+        state.undo.push(JSON.stringify(snapshot()));
+        state.redo.length = 0;
+        if ((existing.mode || 1) < mode) existing.mode = mode;
+        if (mode >= 2 && !existing.vp2) {
+          const b0 = objectBounds(target);
+          const cy0 = (b0.minY + b0.maxY) / 2;
+          const viewA0 = screenToWorld ? screenToWorld(0, 0) : { x: b0.minX - 400, y: cy0 };
+          existing.vp2 = { x: Math.min(b0.minX - 400, Math.min(viewA0.x, b0.minX - 400)), y: existing.vp1 ? existing.vp1.y : cy0 };
+        }
+        state.selectionIndex = existingIndex;
+        state.selection = [existingIndex];
+        redrawAll();
+        showToast("Existing perspective guide selected — drag either red VP; shared stacked VPs move together.");
+        return true;
+      }
+    }
+
+    const pts = perspectiveTargetPoints(target);
+    if (!pts.length) {
+      showToast("No usable shape ends");
+      return false;
+    }
+
+    const b = objectBounds(target);
+    const w = Math.max(80, b.maxX - b.minX);
+    const h = Math.max(60, b.maxY - b.minY);
+    const cy = (b.minY + b.maxY) / 2;
+    const viewA = screenToWorld ? screenToWorld(0, 0) : { x: b.minX - w * 4, y: cy };
+    const viewB = screenToWorld ? screenToWorld(state.viewW || 1200, state.viewH || 800) : { x: b.maxX + w * 4, y: cy };
+    const leftEdge = Math.min(viewA.x, viewB.x);
+    const rightEdge = Math.max(viewA.x, viewB.x);
+    const xPad = Math.max(w * 1.2, (rightEdge - leftEdge) * 0.08, 120);
+    const vpY = cy - Math.max(h * 0.35, 40);
+
+    const guide = {
+      kind: "perspectiveGuide",
+      targetId,
+      mode,
+      color: "#d32f2f",
+      size: 3.5,
+      opacity: 0.78,
+      lineStyle: "reference",
+      vp1: { x: Math.max(b.maxX + w * 2.2, rightEdge + xPad), y: vpY },
+      vp2: { x: Math.min(b.minX - w * 2.2, leftEdge - xPad), y: vpY }
+    };
+
+    state.undo.push(JSON.stringify(snapshot()));
+    state.redo.length = 0;
+    ensureObjId(guide);
+    state.objects.push(guide);
+    state.selectionIndex = state.objects.length - 1;
+    state.selection = [state.selectionIndex];
+    redrawAll();
+    showToast((mode >= 2 ? "2-point" : "1-point") + " perspective guide added — drag the red VP points, or click the orange SOURCE box to grab the starting object.");
+    return true;
+  }
 
 function onPointerDown(e) {
   if (!inkCanvas.contains(e.target)) return;
@@ -1371,20 +3275,50 @@ function onPointerDown(e) {
   return;
 }
 
-    if (state.tool === "polyFill") {
+    const vpHit = hitPerspectivePointAnywhere(sx, sy);
+    if (vpHit && !e.shiftKey) {
+      state.selectionIndex = vpHit.index;
+      state.selection = [vpHit.index];
+      setActiveTool("select");
+      syncStyleControlsFromSelection();
+      if (beginSelectionTransform("perspectivePoint", w, vpHit.name)) {
+        showToast("Drag vanishing point");
+        redrawAll();
+        return;
+      }
+    }
+
+    if (state.tool === "polyFill" || state.tool === "curve") {
       const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
 
       if (!polyDraft.active) {
         polyDraft.active = true;
         polyDraft.pts = [];
+        polyDraft.links = [];
         polyDraft.hover = null;
-        showToast("PolyFill: click points, Enter/dblclick to finish");
+        showToast(state.tool === "curve" ? "Smooth curve: click points, Enter/dblclick/right-click to finish" : "PolyFill: click points, Enter/dblclick to finish");
       }
 
       const p = snapPolyPoint(w, bypassSnap);
+      const first = polyDraft.pts[0];
+      const closeTol = 14 / (state.zoom || 1);
+      if (state.tool === "polyFill" && first && polyDraft.pts.length >= 3 && Math.hypot(first.x - p.x, first.y - p.y) <= closeTol) {
+        try { inkCanvas.releasePointerCapture(e.pointerId); } catch {}
+        gesture.active = false;
+        gesture.mode = "none";
+        commitPolyFill();
+        return;
+      }
+
       const last = polyDraft.pts[polyDraft.pts.length - 1];
       if (!last || Math.hypot(last.x - p.x, last.y - p.y) > 0.01) {
-        polyDraft.pts.push(p);
+        polyDraft.pts.push({ x: p.x, y: p.y });
+        polyDraft.links.push(snapRefForPolyPoint(p));
+        const linkedNote = polyDraft.links[polyDraft.links.length - 1] ? " Linked corner." : "";
+        if (state.tool === "curve") showToast(polyDraft.pts.length < 2 ? "Smooth curve: add one more point." : "Smooth curve: Enter, double-click, or right-click to finish.");
+        else showToast((polyDraft.pts.length < 3 ? `PolyFill: ${polyDraft.pts.length}/3 corners. Add ${3 - polyDraft.pts.length} more.` : "PolyFill: Enter, double-click, right-click, or click near the first point to fill.") + linkedNote);
+      } else {
+        showToast("PolyFill point already there — click a new corner or press Enter to finish.");
       }
 
       try { inkCanvas.releasePointerCapture(e.pointerId); } catch {}
@@ -1423,7 +3357,8 @@ function onPointerDown(e) {
 if (state.tool === "select") {
   const handle = hitHandle(sx, sy);
   if (handle && !e.shiftKey) {
-    if (beginSelectionTransform(handle.kind, w)) {
+    const detail = handle.kind === "perspectiveSource" ? handle : handle.point;
+    if (beginSelectionTransform(handle.kind, w, detail)) {
       redrawAll();
       return;
     }
@@ -1509,6 +3444,18 @@ if (state.tool === "select") {
       return;
     }
 
+    if (state.tool === "perspective1" || state.tool === "perspective2") {
+      const hit = findHit(w.x, w.y);
+      if (hit >= 0) {
+        state.selectionIndex = hit;
+        state.selection = [hit];
+        syncStyleControlsFromSelection();
+      }
+      const made = createPerspectiveGuide(state.tool === "perspective2" ? 2 : 1);
+      if (!made) showToast("Click the line/shape you want to use as the perspective source.");
+      return;
+    }
+
     state.undo.push(JSON.stringify(snapshot()));
     state.redo.length = 0;
     state.selectionIndex = -1;
@@ -1537,11 +3484,18 @@ if (state.tool === "select") {
       const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
 
       let p0;
+      gesture.lineAnchorRef = null;
+      gesture.lineEndAnchorRef = null;
       if (bypassSnap) {
         p0 = { x: w.x, y: w.y };
       } else {
-        p0 = snapPointPreferEndsIntersections(w);
+        const anchorHit = (state.tool === "line" || state.tool === "arrow") ? preferredAnchorAt(w) : null;
+        p0 = anchorHit || snapPointPreferEndsIntersections(w);
         if (!p0) p0 = snapToMmGridWorld(w);
+        if ((state.tool === "line" || state.tool === "arrow") && p0.ref && isLinkRef(p0.ref)) {
+          gesture.lineAnchorRef = cloneRef(p0.ref);
+          gesture.lineEndAnchorRef = cloneRef(p0.ref);
+        }
       }
 
       const fillHeld = e.shiftKey;
@@ -1585,7 +3539,7 @@ if (state.tool === "select") {
     gesture.lastScreen = { sx, sy };
     gesture.lastWorld = w;
 
-    if (state.tool === "polyFill" && polyDraft.active) {
+    if ((state.tool === "polyFill" || state.tool === "curve") && polyDraft.active) {
       const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
       polyDraft.hover = snapPolyPoint(w, bypassSnap);
       redrawAll();
@@ -1611,11 +3565,87 @@ if (state.tool === "select") {
       return;
     }
 
+    if (gesture.mode === "perspectivePoint" && gesture.selIndex >= 0 && gesture.selStartObj) {
+      const name = gesture.perspectivePointName;
+      const startGuide = gesture.selStartObj;
+      if (startGuide && name && startGuide[name]) {
+        const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
+        const p = stableEndpointSnapForPerspectivePoint(w, {
+          bypassSnap,
+          gridSnap: e.shiftKey,
+          skipObjId: startGuide._id
+        });
+        const dx = p.x - startGuide[name].x;
+        const dy = p.y - startGuide[name].y;
+        const cluster = Array.isArray(gesture.perspectivePointCluster) && gesture.perspectivePointCluster.length
+          ? gesture.perspectivePointCluster
+          : [{ index: gesture.selIndex, name, startObj: startGuide }];
+        for (const item of cluster) {
+          const base = item.startObj;
+          if (!base || !base[item.name] || !state.objects[item.index]) continue;
+          const obj = deepClone(base);
+          obj[item.name].x = base[item.name].x + dx;
+          obj[item.name].y = base[item.name].y + dy;
+          state.objects[item.index] = obj;
+        }
+      }
+      redrawAll();
+      return;
+    }
+
+    if (gesture.mode === "lineEndResize" && gesture.selIndex >= 0 && gesture.selStartObj) {
+      const obj = deepClone(gesture.selStartObj);
+      if (obj && (obj.kind === "line" || obj.kind === "arrow")) {
+        const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
+        const endName = gesture.lineResizeEnd || "end";
+        const fixed = endName === "end" ? { x: obj.x1, y: obj.y1 } : { x: obj.x2, y: obj.y2 };
+        let p = snapLinePoint(fixed, w, bypassSnap);
+
+        if (obj.perspectiveLink && endName === "end") {
+          state.objects[gesture.selIndex] = obj;
+          const anchor = resolveAnchorPoint(obj.perspectiveLink.anchor);
+          const vp = resolveVanishingPoint(obj.perspectiveLink.vp);
+          if (anchor && vp) {
+            const vx = vp.x - anchor.x;
+            const vy = vp.y - anchor.y;
+            const vLen = Math.hypot(vx, vy) || 1;
+            const sign = obj.perspectiveLink.direction === -1 ? -1 : 1;
+            const t = ((w.x - anchor.x) * vx + (w.y - anchor.y) * vy) / (vLen * vLen);
+            const amount = Math.max(0.001, Math.abs(t));
+            obj.perspectiveLink.direction = t < 0 ? -1 : sign;
+            obj.perspectiveLink.rayT = amount;
+            obj.perspectiveLink.lengthWorld = amount * vLen;
+            updatePerspectiveLinkedObject(obj);
+          }
+        } else {
+          if (obj.perspectiveLink) delete obj.perspectiveLink;
+          if (endName === "end") {
+            obj.x2 = p.x;
+            obj.y2 = p.y;
+            if (p.ref && isLinkRef(p.ref)) obj.endpointLinks = { ...(obj.endpointLinks || {}), end: cloneRef(p.ref) };
+            else if (obj.endpointLinks) delete obj.endpointLinks.end;
+          } else {
+            obj.x1 = p.x;
+            obj.y1 = p.y;
+            if (p.ref && isLinkRef(p.ref)) obj.endpointLinks = { ...(obj.endpointLinks || {}), start: cloneRef(p.ref) };
+            else if (obj.endpointLinks) delete obj.endpointLinks.start;
+          }
+          state.objects[gesture.selIndex] = obj;
+        }
+        updatePerspectiveLinks();
+        const lenMm = Math.hypot(obj.x2 - obj.x1, obj.y2 - obj.y1) / pxPerMm();
+        showMeasureTip(sx, sy, formatMm(lenMm));
+        redrawAll();
+        return;
+      }
+    }
+
     if (gesture.mode === "selMove" && gesture.selIndex >= 0 && gesture.selStartObj && gesture.startWorld) {
       const dx = w.x - gesture.startWorld.x;
       const dy = w.y - gesture.startWorld.y;
       state.objects[gesture.selIndex] = deepClone(gesture.selStartObj);
       moveObject(state.objects[gesture.selIndex], dx, dy);
+      updatePerspectiveLinks();
       redrawAll();
       return;
     }
@@ -1751,10 +3781,53 @@ if (state.tool === "select") {
       const k = gesture.activeObj.kind;
       const bypassSnap = isMac ? e.metaKey : e.ctrlKey;
 
-      const startPt = { x: gesture.activeObj.x1, y: gesture.activeObj.y1 };
+      let startPt = { x: gesture.activeObj.x1, y: gesture.activeObj.y1 };
       let p2 = { x: w.x, y: w.y };
 
-      if (k === "line" || k === "arrow") p2 = snapLinePoint(startPt, p2, bypassSnap);
+      if (k === "line" || k === "arrow") {
+        p2 = snapLinePoint(startPt, p2, bypassSnap);
+        gesture.lineEndAnchorRef = (!bypassSnap && p2.ref && isLinkRef(p2.ref)) ? cloneRef(p2.ref) : null;
+
+        if (!bypassSnap && gesture.lineAnchorRef && p2.perspectiveRef) {
+          const perspectiveAnchorRef = normalizePerspectiveAnchorForVP(gesture.lineAnchorRef, p2.perspectiveRef, startPt);
+          const perspectiveAnchorPt = resolveAnchorPoint(perspectiveAnchorRef);
+          if (perspectiveAnchorPt) {
+            gesture.activeObj.x1 = perspectiveAnchorPt.x;
+            gesture.activeObj.y1 = perspectiveAnchorPt.y;
+            startPt = { x: perspectiveAnchorPt.x, y: perspectiveAnchorPt.y };
+            p2 = snapLinePoint(startPt, { x: w.x, y: w.y }, bypassSnap);
+          }
+
+          const lengthWorld = Math.max(0.001, Math.hypot(p2.x - startPt.x, p2.y - startPt.y));
+          const vp = resolveVanishingPoint(p2.perspectiveRef);
+          const lenToVp = vp ? Math.hypot(vp.x - startPt.x, vp.y - startPt.y) : 0;
+          const rayT = Number.isFinite(lenToVp) && lenToVp > 0.001 ? Math.max(0.001, lengthWorld / lenToVp) : undefined;
+          gesture.activeObj.perspectiveLink = {
+            anchor: cloneRef(perspectiveAnchorRef || gesture.lineAnchorRef),
+            vp: cloneRef(p2.perspectiveRef),
+            endMode: p2.perspectiveEndMode || "length",
+            direction: p2.perspectiveDirection === -1 ? -1 : 1,
+            lengthWorld,
+            ...(rayT ? { rayT } : {})
+          };
+          delete gesture.activeObj.endpointLinks;
+        } else {
+          if (gesture.activeObj.perspectiveLink) delete gesture.activeObj.perspectiveLink;
+
+          const startRef = gesture.lineAnchorRef || null;
+          const endRef = gesture.lineEndAnchorRef || null;
+          if (startRef || endRef) {
+            gesture.activeObj.endpointLinks = {
+              ...(startRef ? { start: cloneRef(startRef) } : {}),
+              ...(endRef ? { end: cloneRef(endRef) } : {})
+            };
+          } else if (gesture.activeObj.endpointLinks) {
+            delete gesture.activeObj.endpointLinks;
+          }
+
+          if (gesture.forceLinkActive) autoLinkLinesTouchingDrawnLine(gesture.activeObj);
+        }
+      }
       else if (k === "rect" || k === "circle") p2 = snapShapePoint(startPt, p2, bypassSnap);
 
       if (k === "circle" && e.altKey) {
@@ -1792,10 +3865,19 @@ if (state.tool === "select") {
 
   function onPointerUp() {
     if (!gesture.active) return;
+    const finishedObj = gesture.activeObj;
+    let addedPerspectiveHelper = false;
+    if (finishedObj && (finishedObj.kind === "line" || finishedObj.kind === "arrow")) {
+      const seg = lineSegmentFromObject(finishedObj);
+      if (seg) lastDrawnLineId = ensureObjId(finishedObj);
+      addedPerspectiveHelper = ensurePerspectiveExtensionHelper(finishedObj);
+    }
     try { inkCanvas.releasePointerCapture(gesture.pointerId); } catch {}
     hardResetGesture();
     updateCursorFromTool();
+    updatePerspectiveLinks();
     redrawAll();
+    if (addedPerspectiveHelper) showToast("Perspective helper ray added");
   }
 
   /* =========================
@@ -1807,7 +3889,7 @@ if (state.tool === "select") {
     const typing = (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") && activeEl !== lenInput;
     const mod = isMac ? e.metaKey : e.ctrlKey;
 
-    if (!typing && state.tool === "polyFill" && polyDraft.active) {
+    if (!typing && (state.tool === "polyFill" || state.tool === "curve") && polyDraft.active) {
       if (e.key === "Escape") {
         e.preventDefault();
         cancelPolyDraft();
@@ -1818,13 +3900,15 @@ if (state.tool === "select") {
       if (e.key === "Backspace") {
         e.preventDefault();
         polyDraft.pts.pop();
+        if (polyDraft.links) polyDraft.links.pop();
         if (!polyDraft.pts.length) cancelPolyDraft();
         redrawAll();
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        commitPolyFill();
+        if (state.tool === "curve") commitSmoothCurve();
+        else commitPolyFill();
         return;
       }
     }
@@ -1849,6 +3933,128 @@ if (!typing && e.code === "Space") {
   return;
 }
 
+
+    if (!typing && !mod && !gesture.active && state.selectionIndex >= 0) {
+      const selectedObj = state.objects[state.selectionIndex];
+      if (selectedObj && (selectedObj.kind === "line" || selectedObj.kind === "arrow") && (e.key === "m" || e.key === "M")) {
+        e.preventDefault();
+        const b = objectBounds(selectedObj);
+        const centerS = worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+        const curMm = Math.max(1, Math.round(Math.hypot(selectedObj.x2 - selectedObj.x1, selectedObj.y2 - selectedObj.y1) / pxPerMm()) || 1);
+        lenEntry.open = true;
+        lenEntry.seedMm = parseMmInput(String(curMm)) ?? null;
+        openLenBoxAt(centerS.sx, centerS.sy, String(curMm));
+        showToast("Type length in mm, then Enter");
+        return;
+      }
+    }
+
+    if (!typing && !mod && !gesture.active && state.selectionIndex >= 0) {
+      const selectedObj = state.objects[state.selectionIndex];
+      if (selectedObj && (selectedObj.kind === "line" || selectedObj.kind === "arrow")) {
+        const isDigit = /^[0-9]$/.test(e.key);
+        const isDot = e.key === "." || e.key === ",";
+        const isBack = e.key === "Backspace";
+        const isEnter = e.key === "Enter";
+        const isEsc = e.key === "Escape";
+        const isMinus = e.key === "-";
+        if (isDigit || isDot || isBack || isEnter || isEsc || isMinus) {
+          e.preventDefault();
+          const b = objectBounds(selectedObj);
+          const centerS = worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+          if (!lenEntry.open && (isDigit || isDot || isBack || isMinus || isEnter)) {
+            const curMm = Math.max(1, Math.round(Math.hypot(selectedObj.x2 - selectedObj.x1, selectedObj.y2 - selectedObj.y1) / pxPerMm()) || 1);
+            lenEntry.open = true;
+            lenEntry.seedMm = parseMmInput(String(curMm)) ?? null;
+            openLenBoxAt(centerS.sx, centerS.sy, String(curMm));
+          }
+          if (isEsc) {
+            lenEntry.open = false;
+            closeLenBox();
+            return;
+          }
+          if (isEnter) {
+            const raw = (lenInput.value || "").trim() || lenInput.placeholder || "";
+            let mm = parseMmInput(raw);
+            if (mm == null && lenEntry.seedMm != null) mm = lenEntry.seedMm;
+            if (mm == null) {
+              showToast("Invalid mm");
+              return;
+            }
+            state.undo.push(JSON.stringify(snapshot()));
+            state.redo.length = 0;
+            setActiveLineLengthMm(mm);
+            updatePerspectiveLinks();
+            lenEntry.open = false;
+            closeLenBox();
+            redrawAll();
+            showToast(`Line length set to ${Math.round(mm)} mm`);
+            return;
+          }
+          if (!lenEntry.open) return;
+          if (isBack) {
+            lenInput.value = lenInput.value.slice(0, -1);
+            return;
+          }
+          if (isDigit) lenInput.value += e.key;
+          else if (isDot) lenInput.value += ".";
+          else if (isMinus) lenInput.value += "-";
+          return;
+        }
+      }
+    }
+
+    if (!typing && !mod && !gesture.active) {
+      const presetByKey = { "1": "construction", "2": "outline", "3": "fill", "4": "reference", "5": "hidden", "6": "center" };
+      const pickedPreset = presetByKey[e.key];
+      if (pickedPreset) {
+        e.preventDefault();
+        applyDrawingPreset(pickedPreset);
+        return;
+      }
+    }
+
+    if (!typing && (e.key === "i" || e.key === "I") && !mod) {
+      e.preventDefault();
+      if (e.shiftKey) repairSelectedLinks();
+      else checkSelectedLinks(true);
+      return;
+    }
+
+    if (!typing && (e.key === "j" || e.key === "J") && !mod) {
+      e.preventDefault();
+      const lineCandidates = snipJoinCandidateLines();
+      if (lineCandidates.length !== 2) {
+        showToast(lineCandidates.length > 2 ? "Select only the two lines to snip" : "Hover near the second crossing line. Snip uses the selected line, or the last drawn line if none is selected.");
+        return;
+      }
+      state.undo.push(JSON.stringify(snapshot()));
+      state.redo.length = 0;
+      const result = snipAndJoinLineIntersections();
+      redrawAll();
+      showToast(result.changed ? "Snipped/joined lines" : result.reason);
+      return;
+    }
+
+    if (!typing && (e.key === "l" || e.key === "L") && !mod) {
+      const isDrawingLine = gesture.active && gesture.mode === "drawShape" && gesture.activeObj && (gesture.activeObj.kind === "line" || gesture.activeObj.kind === "arrow");
+      const selectedLineObjs = (state.selection || [])
+        .map(i => state.objects[i])
+        .filter(o => o && (o.kind === "line" || o.kind === "arrow"));
+      const allLineObjs = state.objects.filter(o => o && (o.kind === "line" || o.kind === "arrow"));
+
+      if (isDrawingLine || selectedLineObjs.length || state.tool === "line" || state.tool === "arrow") {
+        e.preventDefault();
+        gesture.forceLinkActive = isDrawingLine;
+        state.undo.push(JSON.stringify(snapshot()));
+        state.redo.length = 0;
+        const changed = autoLinkOverlappingLines(isDrawingLine ? [gesture.activeObj] : (selectedLineObjs.length ? selectedLineObjs : allLineObjs));
+        redrawAll();
+        showToast(changed ? "Overlaps linked" : "No overlaps to link");
+        return;
+      }
+    }
+
     if (!typing && (e.key === "f" || e.key === "F")) {
       const idx = state.selectionIndex;
       const obj = idx >= 0 ? state.objects[idx] : null;
@@ -1872,6 +4078,59 @@ if (!typing && e.code === "Space") {
         showToast(obj.filled ? "Filled" : "Unfilled");
       }
       return;
+    }
+
+    if (!typing && gesture.active && gesture.mode === "lineEndResize" && state.selectionIndex >= 0) {
+      const selectedObj = state.objects[state.selectionIndex];
+      if (selectedObj && (selectedObj.kind === "line" || selectedObj.kind === "arrow")) {
+        const isDigit = /^[0-9]$/.test(e.key);
+        const isDot = e.key === "." || e.key === ",";
+        const isBack = e.key === "Backspace";
+        const isEnter = e.key === "Enter";
+        const isEsc = e.key === "Escape";
+        const isMinus = e.key === "-";
+        if (isDigit || isDot || isBack || isEnter || isEsc || isMinus) {
+          e.preventDefault();
+          const sx = gesture.lastScreen?.sx ?? gesture.startScreen?.sx ?? 0;
+          const sy = gesture.lastScreen?.sy ?? gesture.startScreen?.sy ?? 0;
+          if (!lenEntry.open && (isDigit || isDot || isBack || isMinus || isEnter)) {
+            const curMm = Math.max(1, Math.round(Math.hypot(selectedObj.x2 - selectedObj.x1, selectedObj.y2 - selectedObj.y1) / pxPerMm()) || 1);
+            lenEntry.open = true;
+            lenEntry.seedMm = parseMmInput(String(curMm)) ?? null;
+            openLenBoxAt(sx, sy, String(curMm));
+          }
+          if (isEsc) {
+            lenEntry.open = false;
+            closeLenBox();
+            return;
+          }
+          if (isEnter) {
+            const raw = (lenInput.value || "").trim() || lenInput.placeholder || "";
+            let mm = parseMmInput(raw);
+            if (mm == null && lenEntry.seedMm != null) mm = lenEntry.seedMm;
+            if (mm == null) {
+              showToast("Invalid mm");
+              return;
+            }
+            setActiveLineLengthMm(mm);
+            updatePerspectiveLinks();
+            lenEntry.open = false;
+            closeLenBox();
+            redrawAll();
+            showToast(`Line length set to ${Math.round(mm)} mm`);
+            return;
+          }
+          if (!lenEntry.open) return;
+          if (isBack) {
+            lenInput.value = lenInput.value.slice(0, -1);
+            return;
+          }
+          if (isDigit) lenInput.value += e.key;
+          else if (isDot) lenInput.value += ".";
+          else if (isMinus) lenInput.value += "-";
+          return;
+        }
+      }
     }
 
     if (!typing && gesture.active && gesture.mode === "drawArc" && gesture.activeObj?.kind === "arc") {
@@ -1985,13 +4244,20 @@ if (!typing && e.code === "Space") {
       }
     }
 
-    if (!typing && svgReveal.active && e.shiftKey && (e.key === ">" || e.code === "Period")) {
+    if (!typing && !mod && (e.key === "h" || e.key === "H")) {
+      e.preventDefault();
+      if (e.shiftKey) unhideAllObjects();
+      else hideSelectedObjects();
+      return;
+    }
+
+    if (!typing && e.shiftKey && (e.key === ">" || e.code === "Period")) {
       e.preventDefault();
       toggleSvgPlayback();
       return;
     }
 
-    if (!typing && svgReveal.active && e.shiftKey && (e.key === "<" || e.code === "Comma")) {
+    if (!typing && e.shiftKey && (e.key === "<" || e.code === "Comma")) {
       e.preventDefault();
       configureSvgPlayback();
       return;
@@ -2001,23 +4267,16 @@ if (!typing && e.code === "Space") {
       !e.shiftKey &&
       (e.key === "." || e.key === "," || e.code === "Period" || e.code === "Comma" || e.code === "NumpadDecimal");
 
-    if (!typing && svgReveal.active && isRevealKey) {
+    if (!typing && isRevealKey) {
       e.preventDefault();
 
-      if (svgPlayback.running) stopSvgPlayback(true);
-
-      const total = svgReveal.partIds.length;
-      if (!total) return;
-
       if (e.key === "." || e.code === "Period" || e.code === "NumpadDecimal") {
-        revealNextSvgPart();
-        showToast(`SVG: ${Math.min(svgReveal.revealed, total)}/${total}`);
+        revealNextStep();
         return;
       }
 
       if (e.key === "," || e.code === "Comma") {
-        hidePrevSvgPart();
-        showToast(`SVG: ${Math.max(svgReveal.revealed, 0)}/${total}`);
+        revealPrevStep();
         return;
       }
     }
@@ -2056,6 +4315,7 @@ state.selection = [];
       if (k === "t") setActiveTool("text");
       if (k === "e") setActiveTool("eraser");
       if (k === "k") setActiveTool("polyFill");
+      if (k === "u") setActiveTool("curve");
     }
 
     if (mod) {
@@ -2207,6 +4467,19 @@ state.selection = [];
   bindSvgInput(svgInkFile, clearSvgInkBtn);
   bindExport(exportBtn, exportSvgBtn, printBtn);
 
+  hideSelectedBtn?.addEventListener("click", hideSelectedObjects);
+  unhideAllBtn?.addEventListener("click", unhideAllObjects);
+  hideSelectedPanelBtn?.addEventListener("click", hideSelectedObjects);
+  unhideAllPanelBtn?.addEventListener("click", unhideAllObjects);
+  visibilityPrevBtn?.addEventListener("click", revealPrevStep);
+  visibilityNextBtn?.addEventListener("click", revealNextStep);
+  visibilityPlayBtn?.addEventListener("click", toggleSvgPlayback);
+  visibilityTimingBtn?.addEventListener("click", configureSvgPlayback);
+  visibilityPrevPanelBtn?.addEventListener("click", revealPrevStep);
+  visibilityNextPanelBtn?.addEventListener("click", revealNextStep);
+  visibilityPlayPanelBtn?.addEventListener("click", toggleSvgPlayback);
+  visibilityTimingPanelBtn?.addEventListener("click", configureSvgPlayback);
+
   clearBtn?.addEventListener("click", () => {
     state.undo.push(JSON.stringify(snapshot()));
     state.redo.length = 0;
@@ -2219,6 +4492,22 @@ state.selection = [];
     setActiveTool("pen");
     redrawAll();
   });
+linkInspectorCheckBtn?.addEventListener("click", () => checkSelectedLinks(true));
+linkInspectorRepairBtn?.addEventListener("click", () => repairSelectedLinks());
+
+snipJoinBtn?.addEventListener("click", () => {
+    const lineCandidates = snipJoinCandidateLines();
+    if (lineCandidates.length !== 2) {
+      showToast(lineCandidates.length > 2 ? "Select only the two lines to snip" : "Hover near the second crossing line. Snip uses the selected line, or the last drawn line if none is selected.");
+      return;
+    }
+    state.undo.push(JSON.stringify(snapshot()));
+    state.redo.length = 0;
+    const result = snipAndJoinLineIntersections();
+    redrawAll();
+    showToast(result.changed ? "Snipped/joined lines" : result.reason);
+  });
+
    let styleEditSnapshotTaken = false;
    
 colorInput?.addEventListener("input", e => {
@@ -2267,37 +4556,10 @@ opacityRange?.addEventListener("change", () => {
   }
 });
 
-lineStyleSolid?.addEventListener("click", () => {
-  state.lineStyle = "solid";
-  updateBrushUI();
-  if (state.selectionIndex >= 0) {
-    applyStyleToSelection({ lineStyle: "solid" });
-  }
-});
-
-lineStyleReference?.addEventListener("click", () => {
-  state.lineStyle = "reference";
-  updateBrushUI();
-  if (state.selectionIndex >= 0) {
-    applyStyleToSelection({ lineStyle: "reference" });
-  }
-});
-
-lineStyleHidden?.addEventListener("click", () => {
-  state.lineStyle = "hidden";
-  updateBrushUI();
-  if (state.selectionIndex >= 0) {
-    applyStyleToSelection({ lineStyle: "hidden" });
-  }
-});
-
-lineStyleCenter?.addEventListener("click", () => {
-  state.lineStyle = "center";
-  updateBrushUI();
-  if (state.selectionIndex >= 0) {
-    applyStyleToSelection({ lineStyle: "center" });
-  }
-});
+lineStyleSolid?.addEventListener("click", () => applyLineStylePreset("solid"));
+lineStyleReference?.addEventListener("click", () => applyLineStylePreset("reference"));
+lineStyleHidden?.addEventListener("click", () => applyLineStylePreset("hidden"));
+lineStyleCenter?.addEventListener("click", () => applyLineStylePreset("center"));
 
 
    

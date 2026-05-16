@@ -40,6 +40,7 @@ window.WBIO = (() => {
       exportWorldBounds,
       ensureObjId,
       findObjById,
+      perspectiveTargetPoints,
       stopSvgPlayback,
       resetSvgRevealState
     } = ctx;
@@ -60,7 +61,13 @@ window.WBIO = (() => {
         title: state.title,
         pxPerMm: pxPerMm(),
         bg: { ...state.bg },
-        objects: deepClone(state.objects)
+        objects: deepClone(state.objects),
+        svgReveal: {
+          active: !!svgReveal.active,
+          groupId: svgReveal.groupId || null,
+          partIds: Array.isArray(svgReveal.partIds) ? [...svgReveal.partIds] : [],
+          revealed: Number(svgReveal.revealed || 0)
+        }
       };
     }
 
@@ -93,6 +100,26 @@ window.WBIO = (() => {
 
       state.objects = Array.isArray(snap.objects) ? deepClone(snap.objects) : [];
       state.selectionIndex = -1;
+
+      // Restore presentation/reveal metadata. For saved presentations, start
+      // at 0 revealed so the user can press ▶ / . and step through the build.
+      const rev = snap.svgReveal || null;
+      if (rev && Array.isArray(rev.partIds) && rev.partIds.length) {
+        svgReveal.active = true;
+        svgReveal.groupId = rev.groupId || "__manual_hidden_objects__";
+        svgReveal.partIds = rev.partIds.filter(Boolean);
+        svgReveal.revealed = 0;
+        const revealIds = new Set(svgReveal.partIds);
+        for (const obj of state.objects) {
+          if (obj && obj._id && revealIds.has(obj._id)) obj.hidden = true;
+        }
+      } else {
+        const hiddenIds = state.objects.filter(o => o && o.hidden && o._id).map(o => o._id);
+        svgReveal.active = hiddenIds.length > 0;
+        svgReveal.groupId = hiddenIds.length ? "__manual_hidden_objects__" : null;
+        svgReveal.partIds = hiddenIds;
+        svgReveal.revealed = 0;
+      }
 
       if (state.bg && state.bg.src) bgImg.src = state.bg.src;
       else bgImg.removeAttribute("src");
@@ -193,7 +220,8 @@ function performRedo() {
         title: "",
         pxPerMm: state.pxPerMm,
         bg: { src: "", natW: 0, natH: 0, x: 0, y: 0, scale: 1, rot: 0 },
-        objects: []
+        objects: [],
+        svgReveal: { active: false, groupId: null, partIds: [], revealed: 0 }
       };
     }
 
@@ -305,6 +333,15 @@ const exportObjects = [
           continue;
         }
 
+        if (obj.kind === "curve") {
+          const shifted = (obj.points || obj.pts || []).map(p => ({ x: p.x + offsetX, y: p.y + offsetY }));
+          const d = smoothCurvePathFromPoints(shifted);
+          if (!d) continue;
+          const dashAttr = svgDashArray(obj.lineStyle || "solid", obj.size || 2);
+          currentLayer += `<path d="${d}" fill="none" stroke="${obj.color}" stroke-opacity="${op}" stroke-linecap="round" stroke-linejoin="round" stroke-width="${obj.size}"${dashAttr ? ` stroke-dasharray="${dashAttr}"` : ""}/>`;
+          continue;
+        }
+
         if (obj.kind === "text") {
           const m = textMetrics(obj);
           const cx = obj.x + offsetX + m.w / 2;
@@ -320,6 +357,25 @@ const exportObjects = [
             .map(p => `${(p.x + offsetX).toFixed(2)},${(p.y + offsetY).toFixed(2)}`)
             .join(" ");
           currentLayer += `<polygon points="${pts}" fill="${obj.fill || obj.color}" fill-opacity="${op}" stroke="none" />`;
+          continue;
+        }
+
+
+        if (obj.kind === "perspectiveGuide") {
+          const target = findObjById ? findObjById(obj.targetId) : null;
+          const vps = [];
+          if (obj.vp1) vps.push(obj.vp1);
+          if ((obj.mode || 1) >= 2 && obj.vp2) vps.push(obj.vp2);
+          const perspectiveColor = "#d32f2f";
+          const perspectiveWidth = Math.max(3.5, Number(obj.size || 0));
+          const dashAttr = svgDashArray(obj.lineStyle || "reference", perspectiveWidth);
+          for (const vp of vps) {
+            const srcPts = perspectiveTargetPoints ? perspectiveTargetPoints(target, vp, obj) : [];
+            for (const p of srcPts) {
+              currentLayer += `<line x1="${p.x + offsetX}" y1="${p.y + offsetY}" x2="${vp.x + offsetX}" y2="${vp.y + offsetY}" stroke="${perspectiveColor}" stroke-opacity="${op}" stroke-width="${perspectiveWidth}" stroke-linecap="round"${dashAttr ? ` stroke-dasharray="${dashAttr}"` : ""} />`;
+            }
+            currentLayer += `<circle cx="${vp.x + offsetX}" cy="${vp.y + offsetY}" r="7" fill="${perspectiveColor}" fill-opacity="${op}" stroke="white" stroke-width="2" />`;
+          }
           continue;
         }
 
@@ -435,10 +491,12 @@ const exportObjects = [
       }
 
       const inkMarkup = pastLayer + currentLayer;
+      const editableSnapshot = svgEscape(JSON.stringify(snapshotBoard()));
 
       const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
      width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <metadata id="phs-whiteboard-snapshot" data-app="PHS_WHITEBOARD" data-version="9">${editableSnapshot}</metadata>
   <defs>${defs}</defs>
   <rect x="0" y="0" width="${W}" height="${H}" fill="white"/>
   ${bgMarkup}
@@ -623,6 +681,18 @@ const exportObjects = [
       if (!parsedSvg) {
         showToast("SVG not valid");
         return;
+      }
+
+      const editableMeta = parsedSvg.querySelector('metadata#phs-whiteboard-snapshot[data-app="PHS_WHITEBOARD"]');
+      if (editableMeta && editableMeta.textContent) {
+        try {
+          const editableData = JSON.parse(editableMeta.textContent);
+          applyBoard(editableData);
+          showToast("Editable whiteboard loaded — perspective links preserved");
+          return;
+        } catch (err) {
+          console.warn("Editable whiteboard metadata could not be loaded", err);
+        }
       }
 
       const host = ensureHiddenSvgHost();

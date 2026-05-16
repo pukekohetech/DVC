@@ -102,7 +102,7 @@ window.WBUI = (() => {
       toast.textContent = msg;
       toast.classList.add("show");
       clearTimeout(showToast._t);
-      showToast._t = setTimeout(() => toast.classList.remove("show"), 1200);
+      showToast._t = setTimeout(() => toast.classList.remove("show"), Math.min(2800, Math.max(1400, String(msg || "").length * 32)));
     }
 
     function updateSwatch() {
@@ -143,9 +143,31 @@ window.WBUI = (() => {
       updateBrushUI();
     }
 
+    function positionColorPop() {
+      if (!colorPop || !colorBtn) return;
+      const r = colorBtn.getBoundingClientRect();
+      const gap = 10;
+      const width = Math.min(300, Math.max(240, window.innerWidth - 86));
+      colorPop.style.width = width + "px";
+
+      let left = r.right + gap;
+      if (left + width > window.innerWidth - 8) {
+        left = Math.max(8, r.left - width - gap);
+      }
+
+      const popHeight = Math.min(colorPop.scrollHeight || 520, window.innerHeight - 28);
+      const maxTop = Math.max(8, window.innerHeight - popHeight - 8);
+      const top = Math.max(8, Math.min(r.top - 2, maxTop));
+
+      colorPop.style.left = left + "px";
+      colorPop.style.top = top + "px";
+    }
+
     function toggleColorPop(open) {
+      if (!colorPop) return;
       const shouldOpen = open ?? colorPop.classList.contains("is-hidden");
       colorPop.classList.toggle("is-hidden", !shouldOpen);
+      if (shouldOpen) requestAnimationFrame(positionColorPop);
     }
 
     function openSettings(open) {
@@ -156,7 +178,7 @@ window.WBUI = (() => {
 
     function updateCursorFromTool() {
       const t = state.tool;
-      if (["pen", "line", "rect", "circle", "arc", "arrow", "polyFill"].includes(t)) {
+      if (["pen", "line", "rect", "circle", "arc", "arrow", "polyFill", "curve"].includes(t)) {
         inkCanvas.style.cursor = "crosshair";
         return;
       }
@@ -187,12 +209,26 @@ window.WBUI = (() => {
       inkCanvas.style.cursor = "default";
     }
 
+    const TOOL_HINTS = {
+      line: "Line: snap to endpoints/intersections. Start from a corner and draw toward or directly away from a red VP to link perspective. Select a finished line to drag its endpoint handles.",
+      arrow: "Arrow: same snapping/linking as Line, with an arrow head.",
+      polyFill: "PolyFill: click 3+ corners, then Enter, double-click, right-click, or click near the first point to fill.",
+      curve: "Smooth curve: click points along the path, then Enter, double-click, or right-click to draw a smooth curve through them.",
+      perspective1: "1P: click 1P, then click the shape/line to use as the source. Select the guide later and drag the orange SOURCE box to grab the starting object.",
+      perspective2: "2P: click 2P, then click the shape/line to use as the source. Drag either VP to adjust perspective.",
+      arc: "Arc: click centre, drag radius/angle. Right-click or Esc resets while drawing."
+    };
+
     function setActiveTool(tool) {
       hideMeasureTip();
+      const previousTool = state.tool;
+      const changed = previousTool !== tool;
+      if (changed && (previousTool === "polyFill" || previousTool === "curve")) cancelPolyDraft?.();
       state.tool = tool;
       dockBtns.forEach(b => b.classList.toggle("is-active", b.dataset.tool === tool));
       updateCursorFromTool();
-      if (tool !== "polyFill") cancelPolyDraft?.();
+      if (tool !== "polyFill" && tool !== "curve") cancelPolyDraft?.();
+      if (changed && TOOL_HINTS[tool]) showToast(TOOL_HINTS[tool]);
     }
 
     function showMeasureTip(sx, sy, text) {
@@ -273,6 +309,13 @@ window.WBUI = (() => {
           if (!inside && !onGear) openSettings(false);
         }
       });
+
+      window.addEventListener("resize", () => {
+        if (colorPop && !colorPop.classList.contains("is-hidden")) positionColorPop();
+      });
+      document.addEventListener("scroll", () => {
+        if (colorPop && !colorPop.classList.contains("is-hidden")) positionColorPop();
+      }, true);
 
       colorInput?.addEventListener("input", () => {
         setColor(colorInput.value);

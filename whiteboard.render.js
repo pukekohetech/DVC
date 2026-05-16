@@ -24,7 +24,9 @@ window.WBRender = (() => {
       computeHandles,
       polyDraft,
       dpr,
-      getLineDash
+      getLineDash,
+      findObjById,
+      perspectiveTargetPoints
     } = ctx;
 
     function clearCtx(canvasCtx, canvas) {
@@ -37,6 +39,31 @@ window.WBRender = (() => {
       canvasCtx.setTransform(pr, 0, 0, pr, 0, 0);
       canvasCtx.translate(state.panX, state.panY);
       canvasCtx.scale(state.zoom, state.zoom);
+    }
+
+
+    function drawSmoothCurvePath(ctx2, pts) {
+      if (!pts || !pts.length) return;
+      ctx2.moveTo(pts[0].x, pts[0].y);
+      if (pts.length === 1) return;
+      if (pts.length === 2) {
+        ctx2.lineTo(pts[1].x, pts[1].y);
+        return;
+      }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[Math.max(0, i - 1)];
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const p3 = pts[Math.min(pts.length - 1, i + 2)];
+        ctx2.bezierCurveTo(
+          p1.x + (p2.x - p0.x) / 6,
+          p1.y + (p2.y - p0.y) / 6,
+          p2.x - (p3.x - p1.x) / 6,
+          p2.y - (p3.y - p1.y) / 6,
+          p2.x,
+          p2.y
+        );
+      }
     }
 
     function applyBgTransform() {
@@ -90,6 +117,48 @@ window.WBRender = (() => {
       applyWorldTransform(inkCtx);
       inkCtx.lineCap = "round";
       inkCtx.lineJoin = "round";
+
+
+      if (obj.kind === "perspectiveGuide") {
+        inkCtx.globalCompositeOperation = "source-over";
+        const target = findObjById ? findObjById(obj.targetId) : null;
+        const vps = [];
+        if (obj.vp1) vps.push(obj.vp1);
+        if ((obj.mode || 1) >= 2 && obj.vp2) vps.push(obj.vp2);
+
+        const perspectiveColor = "#d32f2f";
+        const perspectiveWidth = Math.max(3.5, Number(obj.size || 0));
+        inkCtx.strokeStyle = perspectiveColor;
+        inkCtx.fillStyle = perspectiveColor;
+        inkCtx.lineWidth = perspectiveWidth;
+        inkCtx.setLineDash([].concat(getLineDash(obj.lineStyle || "reference", perspectiveWidth)));
+
+        for (const vp of vps) {
+          const srcPts = perspectiveTargetPoints ? perspectiveTargetPoints(target, vp, obj) : [];
+          inkCtx.beginPath();
+          for (const p of srcPts) {
+            inkCtx.moveTo(p.x, p.y);
+            inkCtx.lineTo(vp.x, vp.y);
+          }
+          inkCtx.stroke();
+        }
+
+        inkCtx.setLineDash([]);
+        for (let i = 0; i < vps.length; i++) {
+          const vp = vps[i];
+          inkCtx.beginPath();
+          inkCtx.arc(vp.x, vp.y, 7 / (state.zoom || 1), 0, Math.PI * 2);
+          inkCtx.fill();
+          inkCtx.strokeStyle = "rgba(255,255,255,0.95)";
+          inkCtx.lineWidth = 2 / (state.zoom || 1);
+          inkCtx.stroke();
+          inkCtx.strokeStyle = perspectiveColor;
+          inkCtx.lineWidth = perspectiveWidth;
+        }
+
+        inkCtx.restore();
+        return;
+      }
 
       if (obj.kind === "polyFill") {
         inkCtx.globalCompositeOperation = "source-over";
@@ -147,14 +216,16 @@ window.WBRender = (() => {
         return;
       }
 
-      if (obj.kind === "stroke" || obj.kind === "erase") {
+      if (obj.kind === "stroke" || obj.kind === "erase" || obj.kind === "curve") {
         inkCtx.globalCompositeOperation = obj.kind === "erase" ? "destination-out" : "source-over";
         inkCtx.strokeStyle = obj.kind === "erase" ? "rgba(0,0,0,1)" : obj.color;
         inkCtx.lineWidth = obj.size;
+        inkCtx.setLineDash([].concat(getLineDash(obj.lineStyle || "solid", obj.size || 2)));
 
         inkCtx.beginPath();
-        const pts = obj.points || [];
-        if (pts.length) {
+        const pts = obj.points || obj.pts || [];
+        if (obj.kind === "curve") drawSmoothCurvePath(inkCtx, pts);
+        else if (pts.length) {
           inkCtx.moveTo(pts[0].x, pts[0].y);
           for (let i = 1; i < pts.length; i++) inkCtx.lineTo(pts[i].x, pts[i].y);
         }
@@ -262,10 +333,98 @@ window.WBRender = (() => {
       inkCtx.restore();
     }
 
+    function selectedMainObject() {
+      return state.selectionIndex >= 0 ? state.objects[state.selectionIndex] : null;
+    }
+
+    function shouldDrawPolyHandlesUnderLinework() {
+      const obj = selectedMainObject();
+      return state.tool === "select" && obj && obj.kind === "polyFill";
+    }
+
+    function isLineworkObject(obj) {
+      return obj && (obj.kind === "line" || obj.kind === "arrow" || obj.kind === "perspectiveGuide");
+    }
+
+    function drawPolyFillSelectionHandlesOnInk() {
+      computeHandles();
+      const uiHandles = ctx.uiHandles;
+      if (!uiHandles.visible) return;
+
+      const pr = state.pixelRatio || 1;
+      inkCtx.save();
+      inkCtx.setTransform(pr, 0, 0, pr, 0, 0);
+      inkCtx.strokeStyle = "rgba(46, 204, 113, 0.95)";
+      inkCtx.lineWidth = 2;
+      inkCtx.setLineDash([6, 4]);
+
+      if (!uiHandles.poly) {
+        const b = uiHandles.box;
+        if (b) inkCtx.strokeRect(b.x, b.y, b.w, b.h);
+      } else {
+        const p = uiHandles.poly;
+        inkCtx.beginPath();
+        inkCtx.moveTo(p[0].x, p[0].y);
+        for (let i = 1; i < p.length; i++) inkCtx.lineTo(p[i].x, p[i].y);
+        inkCtx.closePath();
+        inkCtx.stroke();
+      }
+
+      inkCtx.setLineDash([]);
+
+      if (uiHandles.rotate) {
+        inkCtx.beginPath();
+        if (!uiHandles.poly && uiHandles.box) {
+          const b = uiHandles.box;
+          inkCtx.moveTo(b.x + b.w / 2, b.y);
+        } else if (uiHandles.poly) {
+          const p = uiHandles.poly;
+          inkCtx.moveTo((p[0].x + p[1].x) / 2, (p[0].y + p[1].y) / 2);
+        }
+        inkCtx.lineTo(uiHandles.rotate.x, uiHandles.rotate.y);
+        inkCtx.stroke();
+
+        inkCtx.fillStyle = "rgba(255,255,255,0.95)";
+        inkCtx.beginPath();
+        inkCtx.arc(uiHandles.rotate.x, uiHandles.rotate.y, uiHandles.rotate.r, 0, Math.PI * 2);
+        inkCtx.fill();
+        inkCtx.stroke();
+      }
+
+      if (uiHandles.corners) {
+        for (const c of uiHandles.corners) {
+          inkCtx.fillStyle = "rgba(255,255,255,0.95)";
+          inkCtx.strokeStyle = "rgba(46, 204, 113, 0.95)";
+          inkCtx.lineWidth = 2;
+          inkCtx.beginPath();
+          inkCtx.rect(c.x - c.s, c.y - c.s, c.s * 2, c.s * 2);
+          inkCtx.fill();
+          inkCtx.stroke();
+        }
+      }
+
+      inkCtx.restore();
+    }
+
     function drawInk() {
       clearCtx(inkCtx, inkCanvas);
+
+      if (!shouldDrawPolyHandlesUnderLinework()) {
+        for (const obj of state.objects) {
+          if (obj && !obj.hidden) drawInkObject(obj);
+        }
+        return;
+      }
+
+      // When editing a PolyFill face, draw its handles before construction linework.
+      // This keeps the face editable while preventing handles from covering the
+      // perspective/edge lines that define the form.
       for (const obj of state.objects) {
-        if (obj && !obj.hidden) drawInkObject(obj);
+        if (obj && !obj.hidden && !isLineworkObject(obj)) drawInkObject(obj);
+      }
+      drawPolyFillSelectionHandlesOnInk();
+      for (const obj of state.objects) {
+        if (obj && !obj.hidden && isLineworkObject(obj)) drawInkObject(obj);
       }
     }
 
@@ -343,6 +502,30 @@ window.WBRender = (() => {
         uiCtx.restore();
       }
 
+      if (state.tool === "curve" && polyDraft.active && polyDraft.pts.length) {
+        uiCtx.save();
+        uiCtx.setTransform(pr, 0, 0, pr, 0, 0);
+        const pts = polyDraft.pts.map(p => worldToScreen(p.x, p.y));
+        const hover = polyDraft.hover ? worldToScreen(polyDraft.hover.x, polyDraft.hover.y) : null;
+        const previewPts = hover ? pts.concat([hover]) : pts;
+        uiCtx.lineWidth = 2;
+        uiCtx.setLineDash([6, 4]);
+        uiCtx.strokeStyle = "rgba(0,0,0,0.65)";
+        uiCtx.beginPath();
+        drawSmoothCurvePath(uiCtx, previewPts);
+        uiCtx.stroke();
+        uiCtx.setLineDash([]);
+        for (const p of pts) {
+          uiCtx.fillStyle = "rgba(255,255,255,0.95)";
+          uiCtx.strokeStyle = "rgba(0,0,0,0.6)";
+          uiCtx.beginPath();
+          uiCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+          uiCtx.fill();
+          uiCtx.stroke();
+        }
+        uiCtx.restore();
+      }
+
       computeHandles();
       const uiHandles = ctx.uiHandles;
       if (!uiHandles.visible) return;
@@ -352,6 +535,91 @@ window.WBRender = (() => {
       uiCtx.strokeStyle = "rgba(46, 204, 113, 0.95)";
       uiCtx.lineWidth = 2;
       uiCtx.setLineDash([6, 4]);
+
+      if (uiHandles.perspective && uiHandles.perspective.length) {
+        const src = uiHandles.perspectiveSource;
+        if (src) {
+          uiCtx.save();
+          uiCtx.strokeStyle = "rgba(255, 145, 0, 0.98)";
+          uiCtx.fillStyle = "rgba(255, 145, 0, 0.12)";
+          uiCtx.lineWidth = 3;
+          uiCtx.setLineDash([8, 5]);
+          uiCtx.strokeRect(src.x, src.y, src.w, src.h);
+          uiCtx.fillRect(src.x, src.y, src.w, src.h);
+          uiCtx.setLineDash([]);
+
+          uiCtx.beginPath();
+          uiCtx.fillStyle = "rgba(255,255,255,0.98)";
+          uiCtx.strokeStyle = "rgba(255, 145, 0, 0.98)";
+          uiCtx.lineWidth = 2;
+          uiCtx.arc(src.cx, src.cy, src.r, 0, Math.PI * 2);
+          uiCtx.fill();
+          uiCtx.stroke();
+
+          const label = "SOURCE";
+          uiCtx.font = "700 11px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+          const tw = uiCtx.measureText(label).width;
+          const lx = src.x;
+          const ly = Math.max(4, src.y - 22);
+          uiCtx.fillStyle = "rgba(255, 145, 0, 0.95)";
+          uiCtx.fillRect(lx, ly, tw + 14, 18);
+          uiCtx.fillStyle = "white";
+          uiCtx.fillText(label, lx + 7, ly + 13);
+          uiCtx.restore();
+        }
+
+        if (uiHandles.box) {
+          const b = uiHandles.box;
+          uiCtx.strokeStyle = "rgba(0, 120, 255, 0.65)";
+          uiCtx.setLineDash([6, 4]);
+          uiCtx.strokeRect(b.x, b.y, b.w, b.h);
+          uiCtx.setLineDash([]);
+        }
+
+        for (const p of uiHandles.perspective) {
+          uiCtx.fillStyle = "rgba(255,255,255,0.98)";
+          uiCtx.strokeStyle = "rgba(0, 120, 255, 0.95)";
+          uiCtx.lineWidth = 2;
+          uiCtx.beginPath();
+          uiCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          uiCtx.fill();
+          uiCtx.stroke();
+
+          uiCtx.fillStyle = "rgba(0, 120, 255, 0.95)";
+          uiCtx.beginPath();
+          uiCtx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          uiCtx.fill();
+        }
+
+        uiCtx.restore();
+        return;
+      }
+
+      if (shouldDrawPolyHandlesUnderLinework()) {
+        uiCtx.restore();
+        return;
+      }
+
+      if (uiHandles.lineEndpoints && uiHandles.lineEndpoints.length) {
+        const b = uiHandles.box;
+        if (b) uiCtx.strokeRect(b.x, b.y, b.w, b.h);
+        uiCtx.setLineDash([]);
+        for (const p of uiHandles.lineEndpoints) {
+          uiCtx.fillStyle = "rgba(255,255,255,0.98)";
+          uiCtx.strokeStyle = "rgba(46, 204, 113, 0.98)";
+          uiCtx.lineWidth = 2;
+          uiCtx.beginPath();
+          uiCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          uiCtx.fill();
+          uiCtx.stroke();
+          uiCtx.fillStyle = "rgba(46, 204, 113, 0.95)";
+          uiCtx.beginPath();
+          uiCtx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          uiCtx.fill();
+        }
+        uiCtx.restore();
+        return;
+      }
 
       if (!uiHandles.poly) {
         const b = uiHandles.box;
