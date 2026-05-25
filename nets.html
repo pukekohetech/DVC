@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Net Builder - Clean SVG and Polygon Sides V13</title>
+  <style id="printStyle">@page{size:A4 landscape;margin:0}</style>
+  <style>
+    :root{--ink:#14213d;--muted:#60708a;--bg:#eaf0f8;--card:#fff;--blue:#1565ff;--green:#17884f;--red:#ff0000;--fold:#0000ff;--orange:#ff8a00;--line:#c8d3e3;--face:#fff8dc;--tab:#eaf3ff}
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
+    header{background:linear-gradient(135deg,#14213d,#30507c);color:#fff;padding:14px 18px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+    header h1{margin:0;font-size:1.35rem} header p{margin:4px 0 0;color:#dbe8ff;font-size:.95rem}
+    .app{display:grid;grid-template-columns:360px 1fr;height:calc(100vh - 72px);min-height:700px}
+    aside{background:#f7faff;border-right:1px solid var(--line);padding:14px;overflow:auto}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:12px;box-shadow:0 2px 12px rgba(20,33,61,.06)}
+    .panel h2{font-size:1rem;margin:0 0 9px;display:flex;gap:8px;align-items:center}.step{display:inline-grid;place-items:center;background:var(--blue);color:#fff;border-radius:999px;width:26px;height:26px;font-weight:900}.hint{font-size:.88rem;color:var(--muted);line-height:1.35;margin:6px 0}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:8px 0}.full{width:100%}
+    label{display:block;font-size:.78rem;color:var(--muted);font-weight:800;margin:0 0 3px} input,select,button{font:inherit} input,select{width:100%;border:1px solid #cdd6e6;border-radius:11px;padding:8px;background:#fff;color:var(--ink)}
+    button{border:0;border-radius:12px;padding:10px 11px;background:var(--blue);color:white;font-weight:800;cursor:pointer} button:hover{filter:brightness(1.05)} button:active{transform:translateY(1px)} button.soft{background:#e8f0ff;color:#17428f;border:1px solid #c4d6ff} button.green{background:var(--green)} button.grey{background:#536277} button.orange{background:var(--orange)} button.red{background:#d92d20}.button-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.big{font-size:1rem;padding:12px}
+    .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mode-grid.compact{grid-template-columns:1fr}.mode-grid button{background:#e8f0ff;color:#17396f;border:2px solid transparent}.mode-grid button.active{background:#d8e8ff;border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue)}
+    main{display:flex;flex-direction:column;min-width:0;min-height:0}.toolbar{background:#fff;border-bottom:1px solid var(--line);padding:10px 12px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}.status{color:var(--muted);font-size:.9rem;line-height:1.3}.canvas-wrap{flex:1;overflow:auto;padding:20px;display:grid;place-items:start center;background:radial-gradient(circle at 30px 30px,rgba(21,101,255,.08) 0 1px,transparent 2px),var(--bg)}
+    #svg{background:#fff;border-radius:8px;box-shadow:0 10px 35px rgba(20,33,61,.22);max-width:100%;height:auto;touch-action:none;user-select:none}.paper{fill:#fff}.grid{stroke:#e0e7f1;stroke-width:.12}.gridBold{stroke:#ccd7e6;stroke-width:.22}.faceFill{fill:var(--face);stroke:none}.tabFill{fill:var(--tab);stroke:none}.cut{stroke:#172033;stroke-width:.45;fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}.fold{stroke:#555;stroke-width:.38;fill:none;stroke-dasharray:2.2 1.4;stroke-linecap:round;vector-effect:non-scaling-stroke}.selected{stroke:#ff8a00;stroke-width:1.1;fill:none;stroke-dasharray:3 1.5;vector-effect:non-scaling-stroke}.hitEdge{stroke:transparent;stroke-width:8;fill:none;pointer-events:stroke;cursor:pointer;vector-effect:non-scaling-stroke}.hitFace{fill:transparent;cursor:move}.corner{fill:#1565ff;stroke:#fff;stroke-width:1;cursor:grab;vector-effect:non-scaling-stroke}.corner:hover{fill:#ff8a00}.label{font-size:4px;font-weight:800;text-anchor:middle;dominant-baseline:middle;fill:#25314a;pointer-events:none}.edgeNum{font-size:4px;font-weight:900;text-anchor:middle;dominant-baseline:middle;fill:#fff;pointer-events:none}.edgeBadge{fill:#1565ff;stroke:#fff;stroke-width:.6;vector-effect:non-scaling-stroke;pointer-events:none}.edgeBadgeAuto{fill:#6b7280}.pageBorder{fill:none;stroke:#99a8bd;stroke-width:.35}.screenOnly{}
+    .legend{display:grid;gap:5px;font-size:.84rem;color:var(--muted);margin-top:8px}.sw{display:inline-block;width:30px;border-top:2px solid #172033;transform:translateY(-4px);margin-right:6px}.sw.foldSw{border-color:#0000ff}.sw.cutSw{border-color:#ff0000}.pill{display:inline-block;background:#eef4ff;color:#1d4d9c;border:1px solid #c9dbff;border-radius:999px;padding:3px 8px;font-size:.78rem;font-weight:800}.dangerText{color:#b42318;font-weight:800}.small{font-size:.8rem;color:var(--muted)}.mode-note{padding:8px 9px;border-radius:10px;background:#eef5ff;border:1px solid #c8d7f8;color:#1e3a8a;font-size:.84rem;font-weight:800;line-height:1.25} details.more{margin-top:8px} details.more summary{cursor:pointer;color:#17428f;font-weight:900;padding:8px 0}
+    @media print{body{background:#fff} header,aside,.toolbar,.screenOnly{display:none!important}.app{display:block;height:auto}.canvas-wrap{padding:0;overflow:visible;background:#fff}#svg{box-shadow:none;border-radius:0;max-width:none}.grid,.gridBold,.pageBorder,.label{display:none}}
+  </style>
+</head>
+<body>
+<header><h1>Simple Printable Net Builder</h1><p>Pick one tool, click the net, drag blue corner dots anytime, and move copied nets independently. Tabs now angle only the end that needs clearance.</p></header>
+<div class="app">
+<aside>
+  <section class="panel">
+    <h2><span class="step">1</span> Make the base</h2>
+    <div class="row"><div><label>Base shape</label><select id="baseType"><option value="rect">Rectangle / square</option><option value="tri">Triangle</option><option value="poly">Regular polygon</option></select></div><div><label>Polygon sides</label><input id="polySides" type="number" min="3" max="120" value="6"></div></div>
+    <div class="row"><div><label>Width / edge mm</label><input id="baseW" type="number" value="60" min="1"></div><div><label>Height mm</label><input id="baseH" type="number" value="60" min="1"></div></div>
+    <button id="makeBase" class="big full green">Create new base</button>
+    <p class="hint">A regular polygon base uses the width box as the edge length. The base will only change when you drag its own blue corners or set one of its side lengths.</p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">2</span> Build and edit</h2>
+    <p class="hint"><b>Blue dots are always draggable.</b> Drag a corner dot to change a shape. Click a side with the selected tool below.</p>
+    <div class="mode-grid">
+      <button id="modeSelect" data-mode="select" class="active">Set side length</button>
+      <button id="modeSide" data-mode="side">Add side</button>
+      <button id="modeLength" data-mode="length">Pair matching sides</button>
+      <button id="modeTab" data-mode="tab">Tabs on/off</button>
+      <button id="modeAddCorner" data-mode="addcorner">Add corner</button>
+      <button id="modeMove" data-mode="move">Move shape/net</button>
+    </div>
+    <button id="modeCorner" data-mode="corner" style="display:none">Move corners</button>
+    <p class="hint" id="modeHint">Click a side to set and lock its length. Nothing gets added in this mode.</p>
+    <div class="row"><div><label>New side depth mm</label><input id="sideDepth" type="number" value="40" min="1"></div><div><label>Tab depth mm</label><input id="tabDepth" type="number" value="8" min="1"></div></div>
+    <div class="row"><div><label>Shape to add</label><select id="sideShape"><option value="rect">Rectangle flap</option><option value="tri">Triangle flap</option><option value="poly">Polygon flap</option></select></div><div><label>Polygon corners</label><input id="sidePolySides" type="number" min="3" max="120" value="6"></div></div>
+    <div class="row"><div><label>Pair number</label><input id="lengthNumber" type="text" inputmode="numeric" value="1" placeholder="1, 2, 3..."></div><div><label>Pairing</label><div class="mode-note" id="pairStatus">Click any side for number 1</div></div></div>
+    <div class="button-row"><button id="setEdgeLength" class="soft">Set selected length...</button><button id="clearLockedLength" class="soft">Unlock selected length</button><button id="clearSideNumber" class="soft">Clear selected number</button><button id="addCornerBtn" class="soft">Add corner mode</button><button id="removeCornerBtn" class="soft">Remove selected corner</button></div>
+    <p class="hint dangerText" id="warning"></p>
+    <details class="more">
+      <summary>More tools</summary>
+      <div class="button-row"><button id="undoBtn" class="soft">Undo Ctrl+Z</button><button id="redoBtn" class="soft">Redo Ctrl+Y</button></div>
+      <div class="button-row"><button id="copyFace" class="soft">Copy selected net</button><button id="pasteFace" class="soft">Paste independent copy</button><button id="deleteFace" class="red">Delete shape</button></div>
+      <div class="button-row"><button id="addTabsAll" class="soft">Add tabs to all safe outside edges</button><button id="clearTabs" class="soft">Clear tabs</button></div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">3</span> Make it fit</h2>
+    <div class="row"><div><label>Page width mm</label><input id="pageW" type="number" value="297" min="1"></div><div><label>Page height mm</label><input id="pageH" type="number" value="210" min="1"></div></div>
+    <label><input id="autoPage" type="checkbox" checked> Auto-grow page to fit net</label>
+    <div class="button-row"><button id="fitPage" class="soft">Fit page to net now</button><button id="centreNet" class="soft">Centre net</button></div>
+    <p class="hint">Auto-grow stops the net being trapped on A4. You can also type any page size you want.</p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">4</span> Download / print</h2>
+    <div class="button-row"><button id="pdfBtn" class="green">Download cutter PDF</button><button id="printBtn" class="grey">Print</button><button id="svgBtn" class="grey">Download SVG</button></div>
+    <div class="legend"><div><span class="sw cutSw"></span>PDF red = outside cut line</div><div><span class="sw foldSw"></span>PDF blue = fold line only where sides/tabs meet</div></div>
+    <p class="hint">Use the PDF for laser/craft cutters: RGB red cut lines and RGB blue fold lines.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Quick help</h2>
+    <p class="hint"><b>Select / set length:</b> safely click a side before typing its size.</p>
+    <p class="hint"><b>Add sides:</b> choose rectangle, triangle, or polygon, then click an outside edge.</p>
+    <p class="hint"><b>Pair matching sides:</b> type a number, then click the two sides that should match. Change the number yourself for a new pair.</p>
+    <p class="hint"><b>Move corners:</b> drag blue corner dots. Joined edges stay attached.</p>
+    <p class="hint"><b>Shortcuts:</b> Ctrl+Z undo, Ctrl+Y or Ctrl+Shift+Z redo, Ctrl+C copy, Ctrl+V paste, Delete remove.</p>
+    <p class="hint"><b>Tabs:</b> click outside edges. Tabs cannot go between two joined shapes. If a tab is close to another shape, only the clashing end angles in first.</p>
+    <p class="hint dangerText" id="warning"></p>
+  </section>
+</aside>
+<main>
+  <div class="toolbar"><div class="status" id="status">Ready.</div><div><span class="pill" id="pagePill">A4 landscape</span> <span class="pill" id="facePill">0 shapes</span></div></div>
+  <div class="canvas-wrap"><svg id="svg" xmlns="http://www.w3.org/2000/svg" aria-label="net builder canvas"></svg></div>
+</main>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg';
+const state={faces:[],nextId:1,mode:'select',selectedId:null,selectedEdge:null,selectedVertex:null,drag:null,pageW:297,pageH:210,autoPage:true,grid:10,clipboard:null,nextAutoGroup:1,lengthPairCount:0,undoStack:[],redoStack:[],maxHistory:80,historyReady:false};
+const els={svg:gid('svg'),status:gid('status'),pagePill:gid('pagePill'),facePill:gid('facePill'),warning:gid('warning'),printStyle:gid('printStyle')};
+function gid(id){return document.getElementById(id)}
+function clamp(v,min,max){return Math.max(min,Math.min(max,Number(v)||0))}
+function round(n){return Math.round(n*1000)/1000}
+function svgEl(tag,attrs={}){const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);return e}
+function pt(x,y){return{x:Number(x),y:Number(y)}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function makeFace(points,label,role='free'){return{id:state.nextId++,label:label||`Shape ${state.nextId-1}`,role,points:points.map(p=>pt(p.x,p.y)),tabs:Array(points.length).fill(false),edgeGroups:Array(points.length).fill(''),edgeLocks:Array(points.length).fill(null),tabDepth:8}}
+function snapshot(){return JSON.stringify({faces:state.faces,nextId:state.nextId,selectedId:state.selectedId,selectedEdge:state.selectedEdge,selectedVertex:state.selectedVertex,pageW:state.pageW,pageH:state.pageH,nextAutoGroup:state.nextAutoGroup,lengthPairCount:state.lengthPairCount})}
+function restoreSnapshot(s){const data=JSON.parse(s);state.faces=data.faces||[];state.nextId=data.nextId||1;state.selectedId=data.selectedId??null;state.selectedEdge=data.selectedEdge??null;state.selectedVertex=data.selectedVertex??null;state.pageW=data.pageW||297;state.pageH=data.pageH||210;state.nextAutoGroup=data.nextAutoGroup||1;state.lengthPairCount=data.lengthPairCount||0;gid('pageW').value=state.pageW;gid('pageH').value=state.pageH;repairJoinedEdges();render()}
+function pushHistory(){if(!state.historyReady)return;const s=snapshot();if(state.undoStack[state.undoStack.length-1]===s)return;state.undoStack.push(s);if(state.undoStack.length>state.maxHistory)state.undoStack.shift();state.redoStack=[]}
+function undo(){if(!state.undoStack.length)return warn('Nothing to undo yet.');state.redoStack.push(snapshot());restoreSnapshot(state.undoStack.pop());warn('Undo.')}
+function redo(){if(!state.redoStack.length)return warn('Nothing to redo yet.');state.undoStack.push(snapshot());restoreSnapshot(state.redoStack.pop());warn('Redo.')}
+function edgeCount(f){return f.points.length}
+function ensureFace(f){if(!Array.isArray(f.edgeGroups))f.edgeGroups=[];while(f.edgeGroups.length<edgeCount(f))f.edgeGroups.push('');if(f.edgeGroups.length>edgeCount(f))f.edgeGroups.length=edgeCount(f);if(!Array.isArray(f.edgeLocks))f.edgeLocks=[];while(f.edgeLocks.length<edgeCount(f))f.edgeLocks.push(null);if(f.edgeLocks.length>edgeCount(f))f.edgeLocks.length=edgeCount(f);f.edgeLocks=f.edgeLocks.map(v=>Number.isFinite(Number(v))&&Number(v)>0?Number(v):null);if(!Array.isArray(f.tabs))f.tabs=[];while(f.tabs.length<edgeCount(f))f.tabs.push(false);if(f.tabs.length>edgeCount(f))f.tabs.length=edgeCount(f)}
+function edge(f,i){return{p1:f.points[i],p2:f.points[(i+1)%f.points.length]}}
+function edgeLen(f,i){const e=edge(f,i);return dist(e.p1,e.p2)}
+function lockEdgeLength(f,i,len){ensureFace(f);if(!f||!Number.isInteger(i)||i<0||i>=edgeCount(f))return;f.edgeLocks[i]=clamp(len,1,100000)}
+function unlockEdgeLength(f,i){ensureFace(f);if(!f||!Number.isInteger(i)||i<0||i>=edgeCount(f))return;f.edgeLocks[i]=null}
+function polygonArea(points){let a=0;for(let i=0;i<points.length;i++){const p=points[i],q=points[(i+1)%points.length];a+=p.x*q.y-q.x*p.y}return a/2}
+function outwardNormal(f,i){const e=edge(f,i),dx=e.p2.x-e.p1.x,dy=e.p2.y-e.p1.y,len=Math.max(.001,Math.hypot(dx,dy));const cw=polygonArea(f.points)>0;return cw?{x:dy/len,y:-dx/len}:{x:-dy/len,y:dx/len}}
+function edgeKey(p1,p2,tol=1000){const a=`${Math.round(p1.x*tol)},${Math.round(p1.y*tol)}`,b=`${Math.round(p2.x*tol)},${Math.round(p2.y*tol)}`;return a<b?`${a}|${b}`:`${b}|${a}`}
+function segmentCoincide(a1,a2,b1,b2){return (dist(a1,b1)<.45&&dist(a2,b2)<.45)||(dist(a1,b2)<.45&&dist(a2,b1)<.45)}
+function isJoined(f,i){const e=edge(f,i);for(const other of state.faces){if(other.id===f.id)continue;for(let j=0;j<edgeCount(other);j++){const oe=edge(other,j);if(segmentCoincide(e.p1,e.p2,oe.p1,oe.p2))return true}}return false}
+function canTab(f,i){return !isJoined(f,i)}
+function projections(points,axis){let min=Infinity,max=-Infinity;for(const p of points){const v=p.x*axis.x+p.y*axis.y;min=Math.min(min,v);max=Math.max(max,v)}return{min,max}}
+function polyOverlap(a,b){const polys=[a,b];for(const pts of polys){for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[(i+1)%pts.length],dx=q.x-p.x,dy=q.y-p.y,len=Math.max(.001,Math.hypot(dx,dy));const axis={x:-dy/len,y:dx/len};const A=projections(a,axis),B=projections(b,axis);if(A.max<=B.min+.15||B.max<=A.min+.15)return false}}return true}
+function rawTabPoly(f,i,depth=null,opts={}){const e=edge(f,i),len=Math.max(.001,edgeLen(f,i)),n=outwardNormal(f,i),ux=(e.p2.x-e.p1.x)/len,uy=(e.p2.y-e.p1.y)/len,d=clamp(depth??(f.tabDepth||gid('tabDepth').value),1,100000);let shift=Number(opts.shift)||0;let leftInset=Number.isFinite(Number(opts.leftInset))?Number(opts.leftInset):Math.min(4,len/3,d/2);let rightInset=Number.isFinite(Number(opts.rightInset))?Number(opts.rightInset):Math.min(4,len/3,d/2);leftInset=clamp(leftInset,-len*.45,len*.9);rightInset=clamp(rightInset,-len*.45,len*.9);shift=clamp(shift,-len*.75,len*.75);return[pt(e.p1.x,e.p1.y),pt(e.p2.x,e.p2.y),pt(e.p2.x+n.x*d+ux*(shift-rightInset),e.p2.y+n.y*d+uy*(shift-rightInset)),pt(e.p1.x+n.x*d+ux*(shift+leftInset),e.p1.y+n.y*d+uy*(shift+leftInset))]}
+function tabHitsSomething(tabPoly,ownerFace,accepted=[]){for(const other of state.faces){if(other.id===ownerFace.id)continue;if(polyOverlap(tabPoly,other.points))return true}for(const a of accepted){if(polyOverlap(tabPoly,a))return true}return false}
+function tabCollisionSide(f,i,tabPoly,accepted=[]){
+  const e=edge(f,i),len=Math.max(.001,edgeLen(f,i)),ux=(e.p2.x-e.p1.x)/len,uy=(e.p2.y-e.p1.y)/len;
+  let left=0,right=0;
+  function addHit(poly){
+    const c=centroid(poly);
+    const t=((c.x-e.p1.x)*ux+(c.y-e.p1.y)*uy)/len;
+    if(t<.5)left++;else right++;
+  }
+  for(const other of state.faces){if(other.id!==f.id&&polyOverlap(tabPoly,other.points))addHit(other.points)}
+  for(const a of accepted){if(polyOverlap(tabPoly,a))addHit(a)}
+  if(left===right)return 'both';
+  return left>right?'left':'right';
+}
+function safeTabPoly(f,i,accepted=[]){
+  if(!canTab(f,i))return null;
+  const wanted=clamp(f.tabDepth||gid('tabDepth').value,1,100000);
+  const len=Math.max(.001,edgeLen(f,i));
+  const baseSlant=Math.min(4,len/3,wanted/2);
+  const normal=rawTabPoly(f,i,wanted,{leftInset:baseSlant,rightInset:baseSlant});
+  if(!tabHitsSomething(normal,f,accepted))return normal;
+
+  // Work out which end of the tab is causing the clash. Try to angle only that side first.
+  const hitSide=tabCollisionSide(f,i,normal,accepted);
+  const insetSteps=[Math.min(len*.10,wanted*.75),Math.min(len*.16,wanted),Math.min(len*.24,wanted*1.25),Math.min(len*.34,wanted*1.5),Math.min(len*.45,wanted*2)];
+  const oneSideFirst=hitSide==='right'?['right','left']:hitSide==='left'?['left','right']:['left','right'];
+  for(const side of oneSideFirst){
+    for(const inset of insetSteps){
+      const opts=side==='left'?{leftInset:inset,rightInset:baseSlant}:{leftInset:baseSlant,rightInset:inset};
+      const t=rawTabPoly(f,i,wanted,opts);
+      if(!tabHitsSomething(t,f,accepted))return t;
+    }
+  }
+
+  // If a tab is trapped between multiple shapes, try a small sideways shift while still changing just one end.
+  const shifts=[-.08,.08,-.16,.16,-.24,.24,-.36,.36].map(v=>v*len);
+  for(const side of oneSideFirst){
+    for(const shift of shifts){
+      for(const inset of insetSteps){
+        const opts=side==='left'?{shift,leftInset:inset,rightInset:baseSlant}:{shift,leftInset:baseSlant,rightInset:inset};
+        const t=rawTabPoly(f,i,wanted,opts);
+        if(!tabHitsSomething(t,f,accepted))return t;
+      }
+    }
+  }
+
+  // Last full-depth fallback: adjust both ends only if the one-sided options cannot fit.
+  for(const leftInset of insetSteps){for(const rightInset of insetSteps){
+    const t=rawTabPoly(f,i,wanted,{leftInset,rightInset});
+    if(!tabHitsSomething(t,f,accepted))return t;
+  }}
+
+  // Final fallback: shrink the tab, keeping the safe side at the normal angle where possible.
+  for(const scale of [.9,.8,.7,.6,.5,.4,.3,.22,.16,.1,.07,.04]){
+    const d=Math.max(1,wanted*scale), smallBase=Math.min(baseSlant,len/3,d/2);
+    for(const side of oneSideFirst){
+      const opts=side==='left'?{leftInset:smallBase*2,rightInset:smallBase}:{leftInset:smallBase,rightInset:smallBase*2};
+      const t=rawTabPoly(f,i,d,opts);
+      if(!tabHitsSomething(t,f,accepted))return t;
+    }
+  }
+  return null
+}
+
+function faceBBox(f,includeTabs=true){let pts=f.points.slice();if(includeTabs)for(let i=0;i<edgeCount(f);i++)if(f.tabs[i]){const t=safeTabPoly(f,i,[]);if(t)pts=pts.concat(t.slice(2));}return bbox(pts)}
+function bbox(points){return{minX:Math.min(...points.map(p=>p.x)),maxX:Math.max(...points.map(p=>p.x)),minY:Math.min(...points.map(p=>p.y)),maxY:Math.max(...points.map(p=>p.y))}}
+function allBBox(){if(!state.faces.length)return{minX:0,minY:0,maxX:0,maxY:0};const boxes=state.faces.map(f=>faceBBox(f,true));return{minX:Math.min(...boxes.map(b=>b.minX)),minY:Math.min(...boxes.map(b=>b.minY)),maxX:Math.max(...boxes.map(b=>b.maxX)),maxY:Math.max(...boxes.map(b=>b.maxY))}}
+function path(points,close=true){return points.map((p,i)=>`${i?'L':'M'} ${round(p.x)} ${round(p.y)}`).join(' ')+(close?' Z':'')}
+function pointString(points){return points.map(p=>`${round(p.x)},${round(p.y)}`).join(' ')}
+function centroid(points){return{x:points.reduce((s,p)=>s+p.x,0)/points.length,y:points.reduce((s,p)=>s+p.y,0)/points.length}}
+function regularPoly(n,side,cx,cy){n=clamp(n,3,120);side=clamp(side,1,100000);const r=side/(2*Math.sin(Math.PI/n));let pts=[];for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;pts.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)})}return pts}
+function rectPoints(w,h,cx,cy){w=clamp(w,1,100000);h=clamp(h,1,100000);return[{x:cx-w/2,y:cy-h/2},{x:cx+w/2,y:cy-h/2},{x:cx+w/2,y:cy+h/2},{x:cx-w/2,y:cy+h/2}]}
+function triPoints(w,h,cx,cy){w=clamp(w,1,100000);h=clamp(h,1,100000);return[{x:cx,y:cy-h/2},{x:cx+w/2,y:cy+h/2},{x:cx-w/2,y:cy+h/2}]}
+function createBase(){pushHistory();const type=gid('baseType').value,w=clamp(gid('baseW').value,1,100000),h=clamp(gid('baseH').value,1,100000),n=clamp(gid('polySides').value,3,120);state.faces=[];state.nextId=1;let pts;if(type==='rect')pts=rectPoints(w,h,160,110);else if(type==='tri')pts=triPoints(w,h,160,110);else pts=regularPoly(n,w,160,110);const base=makeFace(pts,'Base','base');state.faces.push(base);state.selectedId=base.id;state.selectedEdge=null;state.selectedVertex=null;state.lengthPairCount=0;updatePairStatus();fitPageToNet(true);render()}
+function newAutoGroup(){return 'A'+state.nextAutoGroup++}
+function edgeGroup(f,i){ensureFace(f);return (f.edgeGroups[i]||'').toString().trim()}
+function setEdgeGroup(f,i,g){ensureFace(f);f.edgeGroups[i]=(g||'').toString().trim()}
+function isAutoGroup(g){return (g||'').toString().trim().startsWith('A')}
+function readLengthNumber(){const raw=(gid('lengthNumber').value||'').toString().trim();if(!/^\d{1,3}$/.test(raw)){warn('Type a number like 1, 2, 3, then click a side.');return ''}return String(Math.max(1,Math.min(999,Number(raw))))}
+function setNextLengthNumber(n){gid('lengthNumber').value=String(Math.max(1,Math.min(999,Number(n)||1)));updatePairStatus()}
+function updatePairStatus(){const el=gid('pairStatus');if(!el)return;const num=(gid('lengthNumber').value||'1').toString().trim()||'1';el.textContent=`Click sides for number ${num}`}
+function firstEdgeInGroup(group,excludeFaceId=null,excludeEdge=null){
+  if(!group)return null;
+  for(const face of state.faces){ensureFace(face);for(let edgeIndex=0;edgeIndex<edgeCount(face);edgeIndex++){
+    if(face.id===excludeFaceId&&edgeIndex===excludeEdge)continue;
+    if(edgeGroup(face,edgeIndex)===group)return {face,edgeIndex,len:edgeLen(face,edgeIndex)};
+  }}
+  return null;
+}
+function numberSideAsPair(f,i){
+  const num=readLengthNumber();if(!num)return;
+  const existing=firstEdgeInGroup(num,f.id,i);
+  const targetLen=existing?existing.len:edgeLen(f,i);
+  pushHistory();
+  setEdgeGroup(f,i,num);
+  enforceLengthGroup(num,targetLen,existing?existing.face.id:f.id,existing?existing.edgeIndex:i);
+  repairJoinedEdges();
+  enforceLengthGroup(num,targetLen,existing?existing.face.id:f.id,existing?existing.edgeIndex:i);
+  lockManualGroup(num,targetLen);
+  state.lengthPairCount=0;
+  updatePairStatus();
+  const count=state.faces.flatMap(face=>face.edgeGroups||[]).filter(g=>g===num).length;
+  warn(count>1?`Side added to pair ${num} and matched to ${round(targetLen)} mm. Change the pair number yourself for a new pair.`:`Side numbered ${num}. Click the other side that should match it, or type a different number for another pair.`);
+  fitPageToNet(true);render();
+}
+function groupLabel(g){g=(g||'').toString();if(g.startsWith('A'))return 'join';const m=g.match(/^(\d{1,3})__copy/);return m?m[1]:g}
+function edgeMid(f,i){const e=edge(f,i);return pt((e.p1.x+e.p2.x)/2,(e.p1.y+e.p2.y)/2)}
+function verticesAtPoint(p,tol=.18){const refs=[];for(const f of state.faces){for(let i=0;i<f.points.length;i++){if(dist(f.points[i],p)<=tol)refs.push({f,i})}}return refs}
+function moveVertexAndJoined(f,idx,dx,dy){const start=pt(f.points[idx].x,f.points[idx].y);const refs=verticesAtPoint(start);const seen=new Set();for(const r of refs){const key=r.f.id+':'+r.i;if(seen.has(key))continue;seen.add(key);r.f.points[r.i].x+=dx;r.f.points[r.i].y+=dy}}
+function isParentJoinVertex(f,idx){return !!(f&&f.parentEdge&&(idx===0||idx===1))}
+function baseEdgeInGroup(group){
+  if(!group||isAutoGroup(group))return null;
+  const base=state.faces.find(face=>face.role==='base');
+  if(!base)return null;
+  ensureFace(base);
+  for(let i=0;i<edgeCount(base);i++)if(edgeGroup(base,i)===group)return {face:base,edgeIndex:i,len:edgeLen(base,i)};
+  return null;
+}
+function setEdgeLengthAnchored(f,i,len){
+  const count=edgeCount(f),a=i,b=(i+1)%count,e=edge(f,i),cur=Math.max(.001,edgeLen(f,i)),ux=(e.p2.x-e.p1.x)/cur,uy=(e.p2.y-e.p1.y)/cur;
+  const moveA=isParentJoinVertex(f,a),moveB=isParentJoinVertex(f,b);
+  if(moveA&&moveB)return false;
+  if(moveB&&!moveA){
+    const nx=e.p2.x-ux*len,ny=e.p2.y-uy*len;
+    f.points[a].x=nx;f.points[a].y=ny;
+    return true;
+  }
+  const nx=e.p1.x+ux*len,ny=e.p1.y+uy*len;
+  if(moveA&&!moveB){
+    f.points[b].x=nx;f.points[b].y=ny;
+    return true;
+  }
+  moveVertexAndJoined(f,b,nx-e.p2.x,ny-e.p2.y);
+  return true;
+}
+function setEdgeLengthKeepingP1(f,i,len){return setEdgeLengthAnchored(f,i,len)}
+function enforceLengthGroup(group,targetLen,skipFaceId=null,skipEdge=null){
+  if(!group||isAutoGroup(group))return;
+  const source=state.faces.find(face=>face.id===skipFaceId);
+  const baseRef=baseEdgeInGroup(group);
+  const lockedToBase=!!(baseRef&&source&&source.role!=='base');
+  const len=clamp(lockedToBase?baseRef.len:targetLen,1,100000);
+  let guard=0;
+  for(const f of state.faces){ensureFace(f);for(let i=0;i<edgeCount(f);i++){
+    if(f.id===skipFaceId&&i===skipEdge&&!lockedToBase)continue;
+    if(lockedToBase&&f.role==='base')continue;
+    if(edgeGroup(f,i)===group&&Math.abs(edgeLen(f,i)-len)>.05){
+      setEdgeLengthAnchored(f,i,len);
+      guard++;if(guard>1000)return;
+    }
+  }}
+}
+function enforceGroupsForVertex(f,idx){
+  ensureFace(f);
+  const prev=(idx-1+edgeCount(f))%edgeCount(f),next=idx;
+  const done=new Set();
+  for(const i of [prev,next]){
+    const g=edgeGroup(f,i);
+    if(g&&!isAutoGroup(g)&&!done.has(g)){
+      done.add(g);
+      const target=edgeLen(f,i);
+      enforceLengthGroup(g,target,f.id,i);
+      repairJoinedEdges();
+      enforceLengthGroup(g,target,f.id,i);
+    }
+  }
+}
+function enforceAllManualLengthGroups(){
+  const seen=new Set();
+  for(const f of state.faces){ensureFace(f);for(let i=0;i<edgeCount(f);i++){
+    const g=edgeGroup(f,i);
+    if(!g||isAutoGroup(g)||seen.has(g))continue;
+    seen.add(g);
+    enforceLengthGroup(g,edgeLen(f,i),f.id,i);
+    repairJoinedEdges();
+  }}
+}
+
+function enforceLockedLengths(skipFaceId=null,skipEdge=null){
+  let changed=false;
+  for(let pass=0;pass<4;pass++){
+    let passChanged=false;
+    for(const f of state.faces){ensureFace(f);for(let i=0;i<edgeCount(f);i++){
+      const locked=f.edgeLocks[i];
+      if(!Number.isFinite(Number(locked))||Number(locked)<=0)continue;
+      if(f.id===skipFaceId&&i===skipEdge)continue;
+      if(f.role!=='base'&&isAutoGroup(edgeGroup(f,i)))continue;
+      if(Math.abs(edgeLen(f,i)-locked)>.05){setEdgeLengthAnchored(f,i,locked);passChanged=true;changed=true;}
+    }}
+    repairJoinedEdges();
+    if(!passChanged)break;
+  }
+  return changed;
+}
+function lockManualGroup(group,len){
+  if(!group||isAutoGroup(group))return;
+  for(const f of state.faces){ensureFace(f);for(let i=0;i<edgeCount(f);i++){
+    if(edgeGroup(f,i)===group){
+      if(f.role!=='base'&&baseEdgeInGroup(group))continue;
+      lockEdgeLength(f,i,len);
+    }
+  }}
+}
+function clearSelectedLockedLength(){
+  const f=selectedFace();
+  if(!f||!Number.isInteger(state.selectedEdge))return warn('Click a side first.');
+  pushHistory();
+  const g=edgeGroup(f,state.selectedEdge);
+  if(g&&!isAutoGroup(g)){
+    for(const face of state.faces){ensureFace(face);for(let i=0;i<edgeCount(face);i++)if(edgeGroup(face,i)===g)unlockEdgeLength(face,i);}
+    warn('Unlocked size for matching pair '+groupLabel(g)+'.');
+  }else{
+    unlockEdgeLength(f,state.selectedEdge);
+    warn('Unlocked selected side length.');
+  }
+  render();
+}
+function assignSelectedSideNumber(){const f=selectedFace();if(!f||!Number.isInteger(state.selectedEdge))return warn('Click a side first.');const num=readLengthNumber();if(!num)return;pushHistory();setEdgeGroup(f,state.selectedEdge,num);enforceLengthGroup(num,edgeLen(f,state.selectedEdge),f.id,state.selectedEdge);warn('Side numbered '+num+'. Click other sides with the same number to match this length.');fitPageToNet(true);render()}
+function clearSelectedSideNumber(){const f=selectedFace();if(!f||!Number.isInteger(state.selectedEdge))return warn('Click a side first.');if(isAutoGroup(edgeGroup(f,state.selectedEdge)))return warn('This is a join marker, so it is kept to show the shapes are connected.');pushHistory();setEdgeGroup(f,state.selectedEdge,'');render()}
+function chooseOutsideOrientation(candidates,edgeMidPoint,normal){
+  let best=null;
+  for(const pts of candidates){
+    const c=centroid(pts),score=(c.x-edgeMidPoint.x)*normal.x+(c.y-edgeMidPoint.y)*normal.y;
+    if(!best||score>best.score)best={pts,score};
+  }
+  return best?best.pts:candidates[0];
+}
+function nearestEdgeIndexInPoints(points,a,b){
+  let best=0,bestScore=Infinity;
+  for(let k=0;k<points.length;k++){
+    const p1=points[k],p2=points[(k+1)%points.length];
+    const score=Math.min(dist(p1,a)+dist(p2,b),dist(p1,b)+dist(p2,a));
+    if(score<bestScore){bestScore=score;best=k;}
+  }
+  return best;
+}
+function sideTemplatePolygon(kind,edgeLength,depth,corners){
+  if(kind==='tri')return [pt(0,0),pt(edgeLength,0),pt(edgeLength/2,-depth)];
+  if(kind==='poly')return regularPoly(clamp(corners,3,120),edgeLength,0,0);
+  return [pt(0,0),pt(edgeLength,0),pt(edgeLength,-depth),pt(0,-depth)];
+}
+function addSideToEdge(f,i){
+  ensureFace(f);
+  if(isJoined(f,i))return warn('That edge already has a side joined to it. Pick an outside edge.');
+  pushHistory();
+  const kind=gid('sideShape')?gid('sideShape').value:'rect';
+  const d=clamp(gid('sideDepth').value,1,100000);
+  const e=edge(f,i),joinLen=edgeLen(f,i),n=outwardNormal(f,i),m=edgeMid(f,i);
+  let pts;
+  if(kind==='rect'){
+    const p3={x:e.p1.x+n.x*d,y:e.p1.y+n.y*d},p4={x:e.p2.x+n.x*d,y:e.p2.y+n.y*d};
+    pts=[pt(e.p2.x,e.p2.y),pt(e.p1.x,e.p1.y),p3,p4];
+  }else{
+    const sides=gid('sidePolySides')?clamp(gid('sidePolySides').value,3,120):6;
+    const template=sideTemplatePolygon(kind,joinLen,d,sides);
+    const candidates=[];
+    for(let k=0;k<template.length;k++){
+      candidates.push(transformPointsToEdge(template,k,e.p2,e.p1));
+      candidates.push(transformPointsToEdge(template,k,e.p1,e.p2));
+    }
+    pts=chooseOutsideOrientation(candidates,m,n);
+    const seam=nearestEdgeIndexInPoints(pts,e.p2,e.p1);
+    if(seam>0)pts=pts.slice(seam).concat(pts.slice(0,seam));
+  }
+  const label=kind==='tri'?'Triangle side':kind==='poly'?`${gid('sidePolySides')?clamp(gid('sidePolySides').value,3,120):6}-corner side`:'Side';
+  const child=makeFace(pts,`${label} ${state.faces.length}`,'side');
+  child.tabDepth=clamp(gid('tabDepth').value,1,100000);
+  child.parentEdge={faceId:f.id,edge:i};
+  const g=edgeGroup(f,i)||newAutoGroup();
+  setEdgeGroup(f,i,g);setEdgeGroup(child,0,g);
+  state.faces.push(child);repairJoinedEdges();state.selectedId=child.id;state.selectedEdge=null;fitPageToNet(true);render();warn('Shape added and automatically joined to that fold.');
+}
+function tabPoly(f,i){return safeTabPoly(f,i,[])||rawTabPoly(f,i,1)}
+function toggleTab(f,i){if(!canTab(f,i))return warn('Tabs only go on outside edges. This edge is joined to another shape.');if(!f.tabs[i]&&!safeTabPoly(f,i,acceptedTabPolys(f,i)))return warn('That tab still overlaps after trying angle adjustments. Try another outside edge or move the shape.');pushHistory();f.tabs[i]=!f.tabs[i];f.tabDepth=clamp(gid('tabDepth').value,1,100000);fitPageToNet(true);render()}
+function acceptedTabPolys(exFace=null,exEdge=null){const a=[];for(const f of state.faces)for(let i=0;i<edgeCount(f);i++)if(f.tabs[i]&&!(f===exFace&&i===exEdge)){const t=safeTabPoly(f,i,a);if(t)a.push(t)}return a}
+function clearTabs(){pushHistory();state.faces.forEach(f=>f.tabs=f.tabs.map(()=>false));render()}
+function addTabsAll(){pushHistory();const accepted=[];state.faces.forEach(f=>{f.tabDepth=clamp(gid('tabDepth').value,1,100000);for(let i=0;i<edgeCount(f);i++){f.tabs[i]=false;if(canTab(f,i)){const t=safeTabPoly(f,i,accepted);if(t){f.tabs[i]=true;accepted.push(t)}}}});fitPageToNet(true);render()}
+
+
+function addCornerAtPoint(f,i,p){if(!f||!Number.isInteger(i))return warn('Click an edge where the new corner should go.');ensureFace(f);if(isJoined(f,i))return warn('Add corners on outside edges only, so joined folds do not detach.');pushHistory();const e=edge(f,i);const dx=e.p2.x-e.p1.x,dy=e.p2.y-e.p1.y,len2=Math.max(.001,dx*dx+dy*dy);let t=((p.x-e.p1.x)*dx+(p.y-e.p1.y)*dy)/len2;t=Math.max(.08,Math.min(.92,t));const np=pt(e.p1.x+dx*t,e.p1.y+dy*t);f.points.splice(i+1,0,np);f.tabs.splice(i+1,0,false);ensureFace(f);const oldGroup=edgeGroup(f,i);const oldLock=f.edgeLocks[i];f.edgeGroups.splice(i+1,0,'');f.edgeLocks.splice(i+1,0,null);if(!isAutoGroup(oldGroup))setEdgeGroup(f,i,'');if(oldLock){f.edgeLocks[i]=null;f.edgeLocks[i+1]=null;}state.selectedId=f.id;state.selectedEdge=null;state.selectedVertex=i+1;repairJoinedEdges();fitPageToNet(true);render();warn('Corner added where you clicked.')}
+function addCornerToSelected(){setMode('addcorner');warn('Add corner mode: click the edge spot where the new corner should go.')}
+function removeCornerFromSelected(){const f=selectedFace();if(!f)return warn('Click a shape first.');ensureFace(f);if(edgeCount(f)<=3)return warn('A shape needs at least 3 corners.');pushHistory();let v=Number.isInteger(state.selectedVertex)?state.selectedVertex:null;if(v===null&&Number.isInteger(state.selectedEdge))v=(state.selectedEdge+1)%edgeCount(f);if(v===null)v=edgeCount(f)-1;f.points.splice(v,1);f.tabs.splice(Math.max(0,Math.min(v,f.tabs.length-1)),1);f.edgeGroups.splice(Math.max(0,Math.min(v,f.edgeGroups.length-1)),1);if(Array.isArray(f.edgeLocks))f.edgeLocks.splice(Math.max(0,Math.min(v,f.edgeLocks.length-1)),1);ensureFace(f);state.selectedVertex=null;state.selectedEdge=Math.min(v,edgeCount(f)-1);repairJoinedEdges();fitPageToNet(true);render();warn('Corner removed.')}
+function selectedFace(){return state.faces.find(f=>f.id===state.selectedId)||null}
+function angleOf(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}
+function transformPointsToEdge(templatePts,k,targetA,targetB){const a=templatePts[k],b=templatePts[(k+1)%templatePts.length];const L1=Math.max(.001,dist(a,b)),L2=Math.max(.001,dist(targetA,targetB));const sc=L2/L1,rot=angleOf(a,b)-angleOf(targetA,targetB);const cos=Math.cos(-rot),sin=Math.sin(-rot);return templatePts.map(p=>{const x=(p.x-a.x)*sc,y=(p.y-a.y)*sc;return pt(targetA.x+x*cos-y*sin,targetA.y+x*sin+y*cos)})}
+function addCapToEdge(f,i){if(!f||!Number.isInteger(i))return warn('Click an outside edge first, then add a cap.');if(isJoined(f,i))return warn('That edge already has a shape. Pick the far outside edge of your side strip.');const base=state.faces.find(x=>x.role==='base')||state.faces[0];if(!base)return warn('Create a base first.');const e=edge(f,i),n=outwardNormal(f,i),mid=pt((e.p1.x+e.p2.x)/2,(e.p1.y+e.p2.y)/2);let best=null;for(let k=0;k<edgeCount(base);k++){const pts1=transformPointsToEdge(base.points,k,e.p2,e.p1);const c1=centroid(pts1),score1=(c1.x-mid.x)*n.x+(c1.y-mid.y)*n.y;const pts2=transformPointsToEdge(base.points,k,e.p1,e.p2);const c2=centroid(pts2),score2=(c2.x-mid.x)*n.x+(c2.y-mid.y)*n.y;for(const cand of [{pts:pts1,score:score1},{pts:pts2,score:score2}]){if(cand.score>1&&(!best||Math.abs(edgeLen(base,k)-edgeLen(f,i))<best.diff))best={...cand,diff:Math.abs(edgeLen(base,k)-edgeLen(f,i))}}}
+ if(!best)return warn('Could not place the cap. Try selecting a different outside edge.');const cap=makeFace(best.pts,'Cap','cap');cap.tabDepth=clamp(gid('tabDepth').value,1,100000);ensureFace(base);ensureFace(cap);let start=0;for(let k=0;k<edgeCount(base);k++){if(Math.abs(edgeLen(base,k)-edgeLen(cap,0))<.5){start=k;break}}for(let j=0;j<edgeCount(cap);j++){const bg=edgeGroup(base,(start+j)%edgeCount(base));if(bg)setEdgeGroup(cap,j,bg)}const joinGroup=edgeGroup(f,i)||newAutoGroup();setEdgeGroup(f,i,joinGroup);setEdgeGroup(cap,0,joinGroup);state.faces.push(cap);state.selectedId=cap.id;state.selectedEdge=null;fitPageToNet(true);render()}
+
+function copySelected(){
+  const f=selectedFace();
+  if(!f)return warn('Click a shape first.');
+  const group=copiedGroupFaces();
+  if(!group.length)return warn('Click a shape first.');
+  state.clipboard={
+    faces:group.map(face=>({
+      oldId:face.id,
+      label:face.label,
+      role:face.role,
+      points:face.points.map(p=>pt(p.x,p.y)),
+      tabs:(face.tabs||[]).slice(),
+      edgeGroups:(face.edgeGroups||[]).slice(),
+      edgeLocks:(face.edgeLocks||[]).slice(),
+      tabDepth:face.tabDepth,
+      parentEdge:face.parentEdge?{faceId:face.parentEdge.faceId,edge:face.parentEdge.edge}:null
+    })),
+    selectedOldId:f.id
+  };
+  warn(group.length>1?'Connected net copied. Paste makes an independent copy.':'Shape copied. Paste makes an independent copy.');
+}
+function pasteSelected(){
+  if(!state.clipboard)return warn('Copy a shape or connected net first.');
+  pushHistory();
+  const oldFaces=state.clipboard.faces||[];
+  const oldIds=new Set(oldFaces.map(f=>f.oldId));
+  const idMap={},groupMap={};
+  const created=[];
+  for(const cf of oldFaces){
+    const pts=cf.points.map(p=>pt(p.x+18,p.y+18));
+    const role=cf.role==='base'?'free':(cf.role||'free');
+    const f=makeFace(pts,`Copy ${cf.label||state.faces.length}`,role);
+    idMap[cf.oldId]=f.id;
+    f.tabs=(cf.tabs||[]).slice();
+    f.edgeLocks=(cf.edgeLocks||[]).slice();
+    f.edgeGroups=(cf.edgeGroups||[]).map(g=>uniqueCopiedGroupName(g,groupMap));
+    f.tabDepth=cf.tabDepth||8;
+    created.push({face:f,copy:cf});
+  }
+  for(const item of created){
+    const pe=item.copy.parentEdge;
+    if(pe&&oldIds.has(pe.faceId))item.face.parentEdge={faceId:idMap[pe.faceId],edge:pe.edge};
+    state.faces.push(item.face);
+  }
+  state.selectedId=idMap[state.clipboard.selectedOldId]||created[0]?.face.id||null;
+  state.selectedEdge=null;state.selectedVertex=null;
+  repairJoinedEdges();fitPageToNet(true);render();
+  warn(created.length>1?'Pasted an independent connected net. Use Move shape/net to move just this copy.':'Pasted an independent shape. Use Move shape/net to move just this copy.');
+}
+function deleteSelected(){const f=selectedFace();if(!f)return warn('Click a shape first.');pushHistory();if(f.role==='base'&&state.faces.length>1&&!confirm('Delete the base and all other shapes?'))return;if(f.role==='base'){state.faces=[];state.nextId=1;state.selectedId=null;state.selectedEdge=null}else{state.faces=state.faces.filter(x=>x.id!==f.id);state.selectedId=state.faces[0]?.id||null;state.selectedEdge=null}fitPageToNet(true);render()}
+
+function setEdgeLengthWithPopup(face=null,edgeIndex=null){const f=face||selectedFace();const i=Number.isInteger(edgeIndex)?edgeIndex:state.selectedEdge;if(!f||!Number.isInteger(i)||i<0||i>=edgeCount(f))return warn('Click a fold/side first.');if(f.role!=='base'&&isAutoGroup(edgeGroup(f,i)))return warn('This joined fold is controlled by the base. Change the base edge if you want this fold length to change.');const current=round(edgeLen(f,i));const answer=prompt('Set this fold / side length in mm:', String(current));if(answer===null)return;const len=Number(answer);if(!Number.isFinite(len)||len<=0)return warn('Please enter a positive length in mm.');const target=clamp(len,1,100000);pushHistory();state.selectedId=f.id;state.selectedEdge=i;state.selectedVertex=null;setEdgeLengthAnchored(f,i,target);lockEdgeLength(f,i,target);const g=edgeGroup(f,i);let lockedToBase=false;if(g&&!isAutoGroup(g)){const baseRef=baseEdgeInGroup(g);lockedToBase=!!(baseRef&&f.role!=='base');enforceLengthGroup(g,target,f.id,i);if(!lockedToBase)lockManualGroup(g,target);repairJoinedEdges();enforceLengthGroup(g,target,f.id,i)}else repairJoinedEdges();enforceLockedLengths(f.id,i);fitPageToNet(true);render();warn(lockedToBase?'That side is matched to the base, so it stayed at the base length. Change the base edge to change both.':'Selected fold/side locked to '+round(target)+' mm. Matching numbered sides updated too. Click Unlock selected length to let it change again.')}
+function setSelectedEdgeLength(){setEdgeLengthWithPopup()}
+function updateSelectedLengthBox(){const btn=gid('setEdgeLength');const f=selectedFace();const ok=!!(f&&Number.isInteger(state.selectedEdge)&&state.selectedEdge>=0&&state.selectedEdge<edgeCount(f));if(btn){btn.disabled=!ok;btn.textContent=ok?'Set selected length ('+round(edgeLen(f,state.selectedEdge))+' mm)...':'Set selected length...'}}
+function warn(msg){els.warning.textContent=msg;setTimeout(()=>{if(els.warning.textContent===msg)els.warning.textContent=''},3500)}
+function setMode(m){state.mode=m;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===m));const hints={select:'Safely click a side to set and lock its length. Nothing else will be added.',side:'Choose rectangle, triangle, or polygon, then click an outside edge to add that shape.',length:'Type a pair number, then click the two sides that should match. The number stays the same until you change it.',corner:'Drag blue corner dots. Joined edges stay attached.',addcorner:'Click an outside edge where you want the new corner to appear.',tab:'Click an outside edge to show or hide a glue tab. Tabs shrink if space is tight.',move:'Drag any shape to move the whole net.'};gid('modeHint').textContent=hints[m]||'';updatePairStatus();render()}
+function svgPoint(evt){const p=els.svg.createSVGPoint();p.x=evt.clientX;p.y=evt.clientY;const ctm=els.svg.getScreenCTM();return ctm?p.matrixTransform(ctm.inverse()):{x:0,y:0}}
+
+function linkedFaceIds(startId){
+  const ids=new Set([startId]);
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(const f of state.faces){
+      if(f.parentEdge){
+        const a=f.id,b=f.parentEdge.faceId;
+        if(ids.has(a)&&!ids.has(b)){ids.add(b);changed=true;}
+        if(ids.has(b)&&!ids.has(a)){ids.add(a);changed=true;}
+      }
+    }
+  }
+  return [...ids];
+}
+function moveFaceGroup(faceId,dx,dy){
+  const ids=new Set(linkedFaceIds(faceId));
+  state.faces.forEach(f=>{if(ids.has(f.id))f.points.forEach(p=>{p.x+=dx;p.y+=dy})});
+}
+function copiedGroupFaces(){
+  const f=selectedFace();
+  if(!f)return [];
+  const ids=new Set(linkedFaceIds(f.id));
+  return state.faces.filter(face=>ids.has(face.id));
+}
+function uniqueCopiedGroupName(group,map){
+  if(!group)return '';
+  if(!map[group]){
+    if(isAutoGroup(group))map[group]=newAutoGroup();
+    else map[group]=group+'__copy'+(state.nextAutoGroup++);
+  }
+  return map[group];
+}
+function moveOneCorner(faceId,index,dx,dy){const f=state.faces.find(x=>x.id===faceId);if(!f)return;moveVertexAndJoined(f,index,dx,dy);enforceGroupsForVertex(f,index);repairJoinedEdges();enforceLockedLengths();enforceGroupsForVertex(f,index);repairJoinedEdges()}
+function moveAll(dx,dy){state.faces.forEach(f=>f.points.forEach(p=>{p.x+=dx;p.y+=dy}))}
+function repairJoinedEdges(){
+  for(const f of state.faces){
+    if(!f.parentEdge)continue;
+    const parent=state.faces.find(x=>x.id===f.parentEdge.faceId);
+    if(!parent)continue;
+    const i=f.parentEdge.edge;
+    if(!Number.isInteger(i)||i<0||i>=edgeCount(parent))continue;
+    const pe=edge(parent,i);
+    f.points[0].x=pe.p2.x;f.points[0].y=pe.p2.y;
+    f.points[1].x=pe.p1.x;f.points[1].y=pe.p1.y;
+  }
+}
+function joinedParentVertexForChild(f,idx){
+  if(!f||!f.parentEdge||!(idx===0||idx===1))return null;
+  const parent=state.faces.find(x=>x.id===f.parentEdge.faceId);
+  if(!parent)return null;
+  const pe=f.parentEdge.edge;
+  if(!Number.isInteger(pe)||pe<0||pe>=edgeCount(parent))return null;
+  return {faceId:parent.id,index:idx===0?(pe+1)%edgeCount(parent):pe};
+}
+function onDown(evt){const target=evt.target;const p=svgPoint(evt);if(target.classList&&target.classList.contains('corner')){let f=state.faces.find(x=>x.id==target.dataset.id);let idx=Number(target.dataset.v);if(!f)return;if(isParentJoinVertex(f,idx)){state.selectedId=f.id;state.selectedEdge=null;state.selectedVertex=idx;warn('That corner is attached to the base. Move the base corner if you want the base to change, or move an outside corner to resize this side.');render();evt.preventDefault();return}state.selectedId=f.id;state.selectedEdge=null;state.selectedVertex=idx;pushHistory();state.drag={type:'corner',last:p,faceId:f.id,index:idx};evt.preventDefault();return}if(target.classList&&target.classList.contains('hitEdge')){const f=state.faces.find(x=>x.id==target.dataset.id),i=Number(target.dataset.edge);if(!f)return;state.selectedId=f.id;state.selectedEdge=i;state.selectedVertex=null;if(state.mode==='side')addSideToEdge(f,i);else if(state.mode==='tab')toggleTab(f,i);else if(state.mode==='addcorner')addCornerAtPoint(f,i,p);else if(state.mode==='length'){numberSideAsPair(f,i)}else{updateSelectedLengthBox();render();setEdgeLengthWithPopup(f,i)}render();return}if(target.classList&&target.classList.contains('hitFace')){const f=state.faces.find(x=>x.id==target.dataset.id);if(!f)return;state.selectedId=f.id;state.selectedEdge=null;state.selectedVertex=null;if(state.mode==='move'){pushHistory();state.drag={type:'group',last:p,faceId:f.id};evt.preventDefault()}else render()}}
+function onMove(evt){if(!state.drag)return;const p=svgPoint(evt),dx=p.x-state.drag.last.x,dy=p.y-state.drag.last.y;if(state.drag.type==='corner'){moveOneCorner(state.drag.faceId,state.drag.index,dx,dy)}else if(state.drag.type==='group'){moveFaceGroup(state.drag.faceId,dx,dy)}else if(state.drag.type==='net'){moveAll(dx,dy)}state.drag.last=p;fitPageToNet(true);render(false)}
+function onUp(){state.drag=null;fitPageToNet(true);render()}
+function fitPageToNet(silent=false){if(!gid('autoPage').checked&&!silent)return;const b=allBBox(),m=30;let dx=0,dy=0;if(b.minX<5)dx=5-b.minX;if(b.minY<5)dy=5-b.minY;if(dx||dy)moveAll(dx,dy);const b2=allBBox();const w=Math.max(297,b2.maxX+m),h=Math.max(210,b2.maxY+m);state.pageW=Math.ceil(w);state.pageH=Math.ceil(h);gid('pageW').value=state.pageW;gid('pageH').value=state.pageH}
+function centreNet(){pushHistory();const b=allBBox();const dx=state.pageW/2-(b.minX+b.maxX)/2,dy=state.pageH/2-(b.minY+b.maxY)/2;moveAll(dx,dy);render()}
+function drawGrid(svg){const max=Math.max(state.pageW,state.pageH),step=10;for(let x=0;x<=state.pageW;x+=step)svg.appendChild(svgEl('line',{x1:x,y1:0,x2:x,y2:state.pageH,class:x%50===0?'gridBold':'grid'}));for(let y=0;y<=state.pageH;y+=step)svg.appendChild(svgEl('line',{x1:0,y1:y,x2:state.pageW,y2:y,class:y%50===0?'gridBold':'grid'}))}
+function render(updateStatus=true){state.pageW=clamp(gid('pageW').value,1,100000);state.pageH=clamp(gid('pageH').value,1,100000);const svg=els.svg;svg.replaceChildren();svg.setAttribute('viewBox',`0 0 ${state.pageW} ${state.pageH}`);svg.setAttribute('width',`${state.pageW}mm`);svg.setAttribute('height',`${state.pageH}mm`);els.printStyle.textContent=`@page{size:${state.pageW}mm ${state.pageH}mm;margin:0}`;svg.appendChild(svgEl('rect',{x:0,y:0,width:state.pageW,height:state.pageH,class:'paper'}));drawGrid(svg);
+ for(const f of state.faces)drawFace(svg,f);svg.appendChild(svgEl('rect',{x:0,y:0,width:state.pageW,height:state.pageH,class:'pageBorder screenOnly'}));if(updateStatus){els.status.textContent=state.faces.length?'Build mode: '+gid('modeHint').textContent:'Create a base to begin.';els.pagePill.textContent=`${Math.round(state.pageW)} x ${Math.round(state.pageH)} mm`;els.facePill.textContent=`${state.faces.length} shapes`;updateSelectedLengthBox()}}
+function drawFace(svg,f){ensureFace(f);const selected=f.id===state.selectedId;for(let i=0;i<edgeCount(f);i++)if(f.tabs[i]){const t=safeTabPoly(f,i,acceptedTabPolys(f,i));if(t){svg.appendChild(svgEl('polygon',{points:pointString(t),class:'tabFill'}));svg.appendChild(svgEl('path',{d:path([t[0],t[3],t[2],t[1]],false),class:'cut'}))}}
+ svg.appendChild(svgEl('polygon',{points:pointString(f.points),class:'faceFill'}));svg.appendChild(svgEl('polygon',{points:pointString(f.points),class:'hitFace','data-id':f.id}));for(let i=0;i<edgeCount(f);i++){const e=edge(f,i);const fold=isJoined(f,i)||f.tabs[i];svg.appendChild(svgEl('line',{x1:e.p1.x,y1:e.p1.y,x2:e.p2.x,y2:e.p2.y,class:fold?'fold':'cut'}));svg.appendChild(svgEl('line',{x1:e.p1.x,y1:e.p1.y,x2:e.p2.x,y2:e.p2.y,class:'hitEdge screenOnly','data-id':f.id,'data-edge':i}));const g=edgeGroup(f,i);if(g&&!isAutoGroup(g)){const m=edgeMid(f,i),n=outwardNormal(f,i),lbl=groupLabel(g);svg.appendChild(svgEl('circle',{cx:m.x+n.x*6,cy:m.y+n.y*6,r:4.3,class:'edgeBadge'}));const t=svgEl('text',{x:m.x+n.x*6,y:m.y+n.y*6,class:'edgeNum'});t.textContent=lbl;svg.appendChild(t)}}
+ if(selected)svg.appendChild(svgEl('polygon',{points:pointString(f.points),class:'selected screenOnly'}));const c=centroid(f.points);const text=svgEl('text',{x:c.x,y:c.y,class:'label'});text.textContent=f.label;svg.appendChild(text);for(let i=0;i<f.points.length;i++){const p=f.points[i];const active=selected&&state.selectedVertex===i;svg.appendChild(svgEl('circle',{cx:p.x,cy:p.y,r:active?4.8:(selected?3.6:3.1),class:'corner screenOnly','data-id':f.id,'data-v':i}))}}
+function exportSegments(){const cut=new Map(),fold=new Map(),accepted=[];const add=(map,a,b)=>{if(dist(a,b)<.05)return;map.set(edgeKey(a,b),{x1:a.x,y1:a.y,x2:b.x,y2:b.y})};for(const f of state.faces){ensureFace(f);for(let i=0;i<edgeCount(f);i++){const e=edge(f,i);if(f.tabs[i]){const t=safeTabPoly(f,i,accepted);if(t){accepted.push(t);add(fold,t[0],t[1]);add(cut,t[0],t[3]);add(cut,t[3],t[2]);add(cut,t[2],t[1])}else if(isJoined(f,i))add(fold,e.p1,e.p2);else add(cut,e.p1,e.p2)}else if(isJoined(f,i))add(fold,e.p1,e.p2);else add(cut,e.p1,e.p2)}}const foldKeys=new Set(fold.keys());return{cut:[...cut.entries()].filter(([k])=>!foldKeys.has(k)).map(([,s])=>s),fold:[...fold.values()]}}
+function pdfNum(n){return (Math.round(n*1000)/1000).toString()}function byteLen(s){return new TextEncoder().encode(s).length}
+function buildPdf(w,h,stream){const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>',`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfNum(w)} ${pdfNum(h)}] /Resources << >> /Contents 4 0 R >>`,`<< /Length ${byteLen(stream)} >>\nstream\n${stream}\nendstream`];let pdf='%PDF-1.4\n',offs=[0];objs.forEach((o,i)=>{offs[i+1]=byteLen(pdf);pdf+=`${i+1} 0 obj\n${o}\nendobj\n`});const x=byteLen(pdf);pdf+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`;for(let i=1;i<=objs.length;i++)pdf+=`${String(offs[i]).padStart(10,'0')} 00000 n \n`;pdf+=`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF`;return pdf}
+function downloadPdf(){if(!state.faces.length)return warn('Create a base first.');fitPageToNet(true);render();const segs=exportSegments(),mm=72/25.4,h=state.pageH*mm,hair=.1*72/96;const line=s=>`${pdfNum(s.x1*mm)} ${pdfNum(h-s.y1*mm)} m ${pdfNum(s.x2*mm)} ${pdfNum(h-s.y2*mm)} l`;let stream=`q\n0 J 0 j\n${pdfNum(hair)} w\n1 0 0 RG\n`;if(segs.cut.length)stream+=segs.cut.map(line).join('\n')+'\nS\n';stream+=`${pdfNum(hair)} w\n0 0 1 RG\n`;if(segs.fold.length)stream+=segs.fold.map(line).join('\n')+'\nS\n';stream+='Q\n';downloadBlob(buildPdf(state.pageW*mm,state.pageH*mm,stream),'simple-net-red-cut-blue-fold.pdf','application/pdf')}
+function downloadSvg(){
+  const segs=exportSegments();
+  const svg=svgEl('svg',{xmlns:NS,viewBox:`0 0 ${state.pageW} ${state.pageH}`,width:`${state.pageW}mm`,height:`${state.pageH}mm`});
+  const addLine=(s,stroke)=>svg.appendChild(svgEl('line',{x1:round(s.x1),y1:round(s.y1),x2:round(s.x2),y2:round(s.y2),stroke:stroke,'stroke-width':'0.1px',fill:'none','stroke-linecap':'round','stroke-linejoin':'round'}));
+  segs.cut.forEach(s=>addLine(s,'rgb(255,0,0)'));
+  segs.fold.forEach(s=>addLine(s,'rgb(0,0,255)'));
+  downloadBlob('<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(svg),'simple-net-red-cut-blue-fold.svg','image/svg+xml;charset=utf-8')
+}
+function downloadBlob(data,name,type){const blob=new Blob([data],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+['modeSelect','modeSide','modeLength','modeCorner','modeAddCorner','modeTab','modeMove'].forEach(id=>gid(id).addEventListener('click',e=>setMode(e.target.dataset.mode)));gid('makeBase').addEventListener('click',createBase);gid('clearLockedLength').addEventListener('click',clearSelectedLockedLength);gid('clearSideNumber').addEventListener('click',clearSelectedSideNumber);gid('setEdgeLength').addEventListener('click',setSelectedEdgeLength);gid('addCornerBtn').addEventListener('click',addCornerToSelected);gid('removeCornerBtn').addEventListener('click',removeCornerFromSelected);gid('lengthNumber').addEventListener('input',()=>{state.lengthPairCount=0;updatePairStatus()});gid('undoBtn').addEventListener('click',undo);gid('redoBtn').addEventListener('click',redo);gid('copyFace').addEventListener('click',copySelected);gid('pasteFace').addEventListener('click',pasteSelected);gid('deleteFace').addEventListener('click',deleteSelected);gid('addTabsAll').addEventListener('click',addTabsAll);gid('clearTabs').addEventListener('click',clearTabs);gid('fitPage').addEventListener('click',()=>{pushHistory();fitPageToNet(false);render()});gid('centreNet').addEventListener('click',centreNet);gid('pdfBtn').addEventListener('click',downloadPdf);gid('svgBtn').addEventListener('click',downloadSvg);gid('printBtn').addEventListener('click',()=>window.print());gid('autoPage').addEventListener('change',()=>{fitPageToNet(true);render()});['pageW','pageH'].forEach(id=>gid(id).addEventListener('input',()=>render()));els.svg.addEventListener('pointerdown',onDown);window.addEventListener('pointermove',onMove);window.addEventListener('pointerup',onUp);window.addEventListener('keydown',e=>{const key=e.key.toLowerCase();const inField=e.target&&['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName);if((e.ctrlKey||e.metaKey)&&key==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();return}if((e.ctrlKey||e.metaKey)&&key==='y'){e.preventDefault();redo();return}if(inField)return;if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if((e.ctrlKey||e.metaKey)&&key==='c'){e.preventDefault();copySelected();return}if((e.ctrlKey||e.metaKey)&&key==='v'){e.preventDefault();pasteSelected();return}});createBase();state.undoStack=[];state.redoStack=[];state.historyReady=true;updatePairStatus();pushHistory();
+</script>
+</body>
+</html>
