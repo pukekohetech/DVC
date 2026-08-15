@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interactive Cube Projection Animator</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --ink:#111827; --muted:#6b7280;
+    --border:#d1d5db; --accent:#2563eb; --guide:#94a3b8;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    color:var(--ink); background:var(--bg);
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:18px}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:16px;
+    padding:16px; box-shadow:0 8px 28px rgba(0,0,0,.05);
+  }
+  h1{font-size:22px;margin:0 0 5px}
+  .sub{margin:0 0 14px;color:var(--muted);font-size:14px}
+  svg{
+    display:block; width:100%; height:auto; min-height:440px; background:#fff;
+    border:1px solid var(--border); border-radius:12px; touch-action:none; user-select:none;
+  }
+  .edge{
+    stroke:var(--ink); stroke-width:3; fill:none; stroke-linecap:round; stroke-linejoin:round;
+    pointer-events:stroke;
+  }
+  .handle-visible{
+    stroke:var(--accent); stroke-width:5; fill:none; stroke-linecap:round;
+  }
+  .handle-hit{
+    stroke:transparent; stroke-width:30; fill:none; cursor:ew-resize; pointer-events:stroke;
+  }
+  .grip{
+    fill:var(--accent); stroke:#fff; stroke-width:2; pointer-events:none;
+  }
+  .guide{
+    stroke:var(--guide); stroke-width:1.5; stroke-dasharray:7 7; fill:none;
+  }
+  .vp-guide{
+    stroke:var(--accent); stroke-width:1.4; stroke-dasharray:6 6; opacity:.42; fill:none;
+  }
+  .vp{
+    fill:var(--accent); stroke:#fff; stroke-width:2; cursor:move;
+  }
+  .vp-hit{fill:transparent;cursor:move}
+  .cube-hit{
+    fill:transparent; cursor:move; pointer-events:all;
+  }
+  .controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  button{
+    border:1px solid var(--border); background:#fff; color:var(--ink);
+    padding:9px 13px; border-radius:10px; font-weight:650; cursor:pointer;
+  }
+  button:hover{border-color:#9ca3af}
+  button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .controlCard{
+    margin-top:13px; padding:12px; border:1px solid var(--border);
+    border-radius:12px; background:#fff;
+  }
+  .row{
+    display:grid; grid-template-columns:150px 1fr 70px; gap:12px; align-items:center;
+  }
+  .row + .row{margin-top:9px}
+  .row label{font-size:13px;font-weight:650}
+  input[type=range]{width:100%}
+  .value{font-size:13px;color:var(--muted);text-align:right}
+  .note{
+    margin-top:12px; padding:10px 12px; border-radius:10px; background:#f3f4f6;
+    color:#4b5563; font-size:13px; line-height:1.4;
+  }
+  .modeHelp{font-size:13px;color:var(--muted);margin-top:9px}
+  @media (max-width:650px){
+    .row{grid-template-columns:1fr}
+    .value{text-align:left}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h1>Interactive cube projection animator</h1>
+    <p class="sub">Oblique ↔ isometric keeps the equal-length first version. In 2-point, you now move the cube position instead of changing the horizon height.</p>
+
+    <svg id="stage" viewBox="0 0 900 520" role="img" aria-label="Interactive cube projection diagram">
+      <g id="guides"></g>
+      <g id="cube"></g>
+      <g id="handles"></g>
+    </svg>
+
+    <div class="controls">
+      <button id="obliqueBtn" class="active">Oblique</button>
+      <button id="isoBtn">Isometric</button>
+      <button id="oneBtn">1-point</button>
+      <button id="twoBtn">2-point</button>
+      <button id="playBtn">Play all</button>
+    </div>
+
+    <div class="controlCard" id="axoControls">
+      <div class="row">
+        <label for="axoSlider">Oblique ↔ isometric</label>
+        <input id="axoSlider" type="range" min="0" max="100" value="0">
+        <div class="value" id="axoValue">45° / 0°</div>
+      </div>
+      <div class="modeHelp">You can also grab either blue outside vertical edge and drag left/right.</div>
+    </div>
+
+    <div class="controlCard" id="oneControls" hidden>
+      <div class="row">
+        <label for="oneX">Vanishing point X</label>
+        <input id="oneX" type="range" min="70" max="830" value="450">
+        <div class="value" id="oneXVal">450</div>
+      </div>
+      <div class="row">
+        <label for="oneY">Vanishing point Y</label>
+        <input id="oneY" type="range" min="60" max="460" value="200">
+        <div class="value" id="oneYVal">200</div>
+      </div>
+      <div class="modeHelp">Or drag the blue vanishing point directly anywhere on the drawing.</div>
+    </div>
+
+    <div class="controlCard" id="twoControls" hidden>
+      <div class="row">
+        <label for="twoX">Cube position X</label>
+        <input id="twoX" type="range" min="220" max="680" value="450">
+        <div class="value" id="twoXVal">450</div>
+      </div>
+      <div class="row">
+        <label for="twoY">Cube position Y</label>
+        <input id="twoY" type="range" min="170" max="370" value="278">
+        <div class="value" id="twoYVal">278</div>
+      </div>
+      <div class="modeHelp">Drag the cube itself to reposition it in 2-point perspective. The horizon stays fixed.</div>
+    </div>
+
+    <div class="note">
+      In oblique and isometric, every drawn cube edge stays the same length. In 1-point and 2-point perspective, the 3D cube still represents equal edges, but the 2D drawing must foreshorten and converge toward vanishing points.
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const guidesG = document.getElementById('guides');
+  const cubeG = document.getElementById('cube');
+  const handlesG = document.getElementById('handles');
+
+  const obliqueBtn = document.getElementById('obliqueBtn');
+  const isoBtn = document.getElementById('isoBtn');
+  const oneBtn = document.getElementById('oneBtn');
+  const twoBtn = document.getElementById('twoBtn');
+  const playBtn = document.getElementById('playBtn');
+
+  const axoControls = document.getElementById('axoControls');
+  const oneControls = document.getElementById('oneControls');
+  const twoControls = document.getElementById('twoControls');
+
+  const axoSlider = document.getElementById('axoSlider');
+  const axoValue = document.getElementById('axoValue');
+  const oneX = document.getElementById('oneX');
+  const oneY = document.getElementById('oneY');
+  const oneXVal = document.getElementById('oneXVal');
+  const oneYVal = document.getElementById('oneYVal');
+  const twoX = document.getElementById('twoX');
+  const twoY = document.getElementById('twoY');
+  const twoXVal = document.getElementById('twoXVal');
+  const twoYVal = document.getElementById('twoYVal');
+
+  const W = 900, H = 520;
+  const centreX = 450, topY = 112;
+  const L = 132;
+  const horizonY = 205;
+
+  let mode = 'oblique';
+  let axoT = 0;
+  let oneVP = {x:450, y:200};
+  let twoCube = {x:450, y:278};
+  let currentPoints = null;
+  let raf = null;
+  let drag = null;
+  let playToken = 0;
+
+  const edges = [
+    [0,1],[1,2],[2,3],[3,0],
+    [4,5],[5,6],[6,7],[7,4],
+    [0,4],[1,5],[2,6],[3,7]
+  ];
+
+  const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
+  const rad = d => d*Math.PI/180;
+  const lerp = (a,b,t) => a+(b-a)*t;
+  const P = (a,b,t) => [lerp(a[0],b[0],t), lerp(a[1],b[1],t)];
+
+  function svgPoint(evt){
+    const r = stage.getBoundingClientRect();
+    return {
+      x:(evt.clientX-r.left)*W/r.width,
+      y:(evt.clientY-r.top)*H/r.height
+    };
+  }
+
+  function vector(angleDeg){
+    return [L*Math.cos(rad(angleDeg)), L*Math.sin(rad(angleDeg))];
+  }
+
+  function axoGeometry(t){
+    const rightAngle = 30*t;
+    const depthAngle = 45-15*t;
+
+    const u = vector(rightAngle);
+    const w = [-L*Math.cos(rad(depthAngle)), L*Math.sin(rad(depthAngle))];
+    const v = [0,L];
+
+    const A = [
+      centreX-(u[0]+w[0])/2,
+      topY
+    ];
+
+    const add = (p,q) => [p[0]+q[0],p[1]+q[1]];
+    const B=add(A,u), C=add(A,v), D=add(B,v);
+    const E=add(A,w), F=add(B,w), G=add(C,w), Hh=add(D,w);
+
+    return [A,B,D,C,E,F,Hh,G];
+  }
+
+  function onePointGeometry(){
+    const halfW=108, halfH=108;
+    const cx=450, cy=285;
+
+    const front = [
+      [cx-halfW,cy-halfH],
+      [cx+halfW,cy-halfH],
+      [cx+halfW,cy+halfH],
+      [cx-halfW,cy+halfH]
+    ];
+
+    const depth = .43;
+    const back = front.map(p=>P(p,[oneVP.x,oneVP.y],depth));
+    return [...front,...back];
+  }
+
+  function lineIntersection(a,b,c,d){
+    const x1=a[0],y1=a[1],x2=b[0],y2=b[1];
+    const x3=c[0],y3=c[1],x4=d[0],y4=d[1];
+    const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+    if(Math.abs(den)<1e-8) return [(x2+x3)/2,(y2+y3)/2];
+    const A=x1*y2-y1*x2;
+    const B=x3*y4-y3*x4;
+    return [
+      (A*(x3-x4)-(x1-x2)*B)/den,
+      (A*(y3-y4)-(y1-y2)*B)/den
+    ];
+  }
+
+  function yOnLineAtX(a,b,x){
+    const dx=b[0]-a[0];
+    if(Math.abs(dx)<1e-8) return a[1];
+    const t=(x-a[0])/dx;
+    return a[1]+t*(b[1]-a[1]);
+  }
+
+  function twoPointGeometry(){
+    const vpl=[55,horizonY], vpr=[845,horizonY];
+    const nearTop=[twoCube.x, twoCube.y-72];
+    const nearBottom=[twoCube.x, twoCube.y+145];
+
+    const lt=P(nearTop,vpl,.37);
+    const rt=P(nearTop,vpr,.37);
+
+    const lb=[lt[0], yOnLineAtX(nearBottom,vpl,lt[0])];
+    const rb=[rt[0], yOnLineAtX(nearBottom,vpr,rt[0])];
+
+    const farTop=lineIntersection(lt,vpr,rt,vpl);
+    const farBottom=lineIntersection(lb,vpr,rb,vpl);
+
+    return [nearTop,rt,rb,nearBottom,lt,farTop,farBottom,lb];
+  }
+
+  function geometryFor(target){
+    if(target==='oblique') return axoGeometry(0);
+    if(target==='isometric') return axoGeometry(1);
+    if(target==='one') return onePointGeometry();
+    if(target==='two') return twoPointGeometry();
+  }
+
+  function line(a,b,cls='edge',extra=''){
+    return `<line class="${cls}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" ${extra}/>`;
+  }
+
+  function renderCube(points){
+    const pathHtml = edges.map(([a,b])=>line(points[a],points[b])).join('');
+    let hitHtml = '';
+    if(mode === 'two'){
+      const xs = points.map(p=>p[0]);
+      const ys = points.map(p=>p[1]);
+      const minX = Math.min(...xs) - 18;
+      const maxX = Math.max(...xs) + 18;
+      const minY = Math.min(...ys) - 18;
+      const maxY = Math.max(...ys) + 18;
+      hitHtml = `<rect id="twoCubeHit" class="cube-hit" x="${minX}" y="${minY}" width="${maxX-minX}" height="${maxY-minY}" />`;
+    }
+    cubeG.innerHTML = pathHtml + hitHtml;
+  }
+
+  function renderGuides(points){
+    let h='';
+
+    if(mode==='one'){
+      for(const i of [0,1,2,3]){
+        h += line(points[i],[oneVP.x,oneVP.y],'vp-guide');
+      }
+      h += `<circle class="vp" id="oneVpDot" cx="${oneVP.x}" cy="${oneVP.y}" r="7"/>`;
+      h += `<circle class="vp-hit" id="oneVpHit" cx="${oneVP.x}" cy="${oneVP.y}" r="20"/>`;
+    }
+
+    if(mode==='two'){
+      const vpl=[55,horizonY], vpr=[845,horizonY];
+      h += line([35,horizonY],[865,horizonY],'guide');
+      h += line(points[0],vpl,'vp-guide');
+      h += line(points[3],vpl,'vp-guide');
+      h += line(points[0],vpr,'vp-guide');
+      h += line(points[3],vpr,'vp-guide');
+      h += `<circle class="vp" cx="${vpl[0]}" cy="${vpl[1]}" r="6"/>`;
+      h += `<circle class="vp" cx="${vpr[0]}" cy="${vpr[1]}" r="6"/>`;
+    }
+
+    guidesG.innerHTML=h;
+  }
+
+  function renderAxoHandles(points){
+    if(!(mode==='oblique' || mode==='isometric')){
+      handlesG.innerHTML='';
+      return;
+    }
+
+    const l1=points[4], l2=points[7], r1=points[1], r2=points[2];
+    handlesG.innerHTML =
+      line(l1,l2,'handle-visible') +
+      line(l1,l2,'handle-hit','data-side="left"') +
+      line(r1,r2,'handle-visible') +
+      line(r1,r2,'handle-hit','data-side="right"') +
+      `<circle class="grip" cx="${l1[0]}" cy="${(l1[1]+l2[1])/2}" r="7"/>`+
+      `<circle class="grip" cx="${r1[0]}" cy="${(r1[1]+r2[1])/2}" r="7"/>`;
+  }
+
+  function syncControls(){
+    obliqueBtn.classList.toggle('active',mode==='oblique');
+    isoBtn.classList.toggle('active',mode==='isometric');
+    oneBtn.classList.toggle('active',mode==='one');
+    twoBtn.classList.toggle('active',mode==='two');
+
+    axoControls.hidden=!(mode==='oblique'||mode==='isometric');
+    oneControls.hidden=mode!=='one';
+    twoControls.hidden=mode!=='two';
+
+    axoSlider.value=Math.round(axoT*100);
+    const rightAngle=30*axoT;
+    const depthAngle=45-15*axoT;
+    axoValue.textContent=`${depthAngle.toFixed(1).replace('.0','')}° / ${rightAngle.toFixed(1).replace('.0','')}°`;
+
+    oneX.value=Math.round(oneVP.x);
+    oneY.value=Math.round(oneVP.y);
+    oneXVal.textContent=Math.round(oneVP.x);
+    oneYVal.textContent=Math.round(oneVP.y);
+
+    twoX.value=Math.round(twoCube.x);
+    twoY.value=Math.round(twoCube.y);
+    twoXVal.textContent=Math.round(twoCube.x);
+    twoYVal.textContent=Math.round(twoCube.y);
+  }
+
+  function render(){
+    if(!currentPoints) currentPoints=geometryFor(mode);
+    renderCube(currentPoints);
+    renderGuides(currentPoints);
+    renderAxoHandles(currentPoints);
+    syncControls();
+  }
+
+  function stopAnimation(){
+    if(raf) cancelAnimationFrame(raf);
+    raf=null;
+    playToken++;
+  }
+
+  function animatePoints(from,to,duration=820){
+    if(raf) cancelAnimationFrame(raf);
+    const started=performance.now();
+
+    return new Promise(resolve=>{
+      function frame(now){
+        const p=clamp((now-started)/duration,0,1);
+        const e=p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+        currentPoints=from.map((a,i)=>P(a,to[i],e));
+        renderCube(currentPoints);
+        guidesG.innerHTML='';
+        handlesG.innerHTML='';
+        if(p<1){
+          raf=requestAnimationFrame(frame);
+        }else{
+          raf=null;
+          currentPoints=to.map(p=>[...p]);
+          resolve();
+        }
+      }
+      raf=requestAnimationFrame(frame);
+    });
+  }
+
+  function animateAxoTo(targetT,duration=760){
+    if(raf) cancelAnimationFrame(raf);
+    const start=axoT;
+    const started=performance.now();
+
+    return new Promise(resolve=>{
+      function frame(now){
+        const p=clamp((now-started)/duration,0,1);
+        const e=p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+        axoT=lerp(start,targetT,e);
+        currentPoints=axoGeometry(axoT);
+        mode = axoT < .5 ? 'oblique' : 'isometric';
+        render();
+        if(p<1) raf=requestAnimationFrame(frame);
+        else { raf=null; resolve(); }
+      }
+      raf=requestAnimationFrame(frame);
+    });
+  }
+
+  async function goTo(target){
+    stopAnimation();
+
+    if((mode==='oblique'||mode==='isometric') && (target==='oblique'||target==='isometric')){
+      await animateAxoTo(target==='oblique'?0:1);
+      mode=target; axoT=target==='oblique'?0:1;
+      currentPoints=axoGeometry(axoT);
+      render();
+      return;
+    }
+
+    const from=currentPoints ? currentPoints.map(p=>[...p]) : geometryFor(mode);
+    mode=target;
+
+    if(target==='oblique'){ axoT=0; }
+    if(target==='isometric'){ axoT=1; }
+
+    const to=geometryFor(target);
+    syncControls();
+    await animatePoints(from,to);
+    currentPoints=geometryFor(target);
+    render();
+  }
+
+  obliqueBtn.addEventListener('click',()=>goTo('oblique'));
+  isoBtn.addEventListener('click',()=>goTo('isometric'));
+  oneBtn.addEventListener('click',()=>goTo('one'));
+  twoBtn.addEventListener('click',()=>goTo('two'));
+
+  axoSlider.addEventListener('input',()=>{
+    stopAnimation();
+    axoT=Number(axoSlider.value)/100;
+    mode=axoT<.5?'oblique':'isometric';
+    currentPoints=axoGeometry(axoT);
+    render();
+  });
+
+  function updateOneFromSliders(){
+    stopAnimation();
+    oneVP.x=Number(oneX.value);
+    oneVP.y=Number(oneY.value);
+    mode='one';
+    currentPoints=onePointGeometry();
+    render();
+  }
+  oneX.addEventListener('input',updateOneFromSliders);
+  oneY.addEventListener('input',updateOneFromSliders);
+
+  function updateTwoFromSliders(){
+    stopAnimation();
+    twoCube.x=Number(twoX.value);
+    twoCube.y=Number(twoY.value);
+    mode='two';
+    currentPoints=twoPointGeometry();
+    render();
+  }
+  twoX.addEventListener('input',updateTwoFromSliders);
+  twoY.addEventListener('input',updateTwoFromSliders);
+
+  handlesG.addEventListener('pointerdown',evt=>{
+    const el=evt.target.closest('.handle-hit');
+    if(!el) return;
+    stopAnimation();
+    el.setPointerCapture(evt.pointerId);
+    const pt=svgPoint(evt);
+    drag={type:'axo',pointerId:evt.pointerId,side:el.dataset.side,startX:pt.x,startT:axoT};
+  });
+
+  handlesG.addEventListener('pointermove',evt=>{
+    if(!drag || drag.type!=='axo' || drag.pointerId!==evt.pointerId) return;
+    const pt=svgPoint(evt);
+    const dx=pt.x-drag.startX;
+    const direction=drag.side==='right'?1:-1;
+    axoT=clamp(drag.startT + direction*dx/65,0,1);
+    mode=axoT<.5?'oblique':'isometric';
+    currentPoints=axoGeometry(axoT);
+    render();
+  });
+
+  guidesG.addEventListener('pointerdown',evt=>{
+    const vp=evt.target.closest('#oneVpHit, #oneVpDot');
+    if(vp && mode==='one'){
+      stopAnimation();
+      vp.setPointerCapture(evt.pointerId);
+      drag={type:'oneVP',pointerId:evt.pointerId};
+    }
+  });
+
+  cubeG.addEventListener('pointerdown',evt=>{
+    const box = evt.target.closest('#twoCubeHit');
+    if(box && mode==='two'){
+      stopAnimation();
+      box.setPointerCapture(evt.pointerId);
+      const pt=svgPoint(evt);
+      drag={type:'twoCube',pointerId:evt.pointerId,startX:pt.x,startY:pt.y,startCubeX:twoCube.x,startCubeY:twoCube.y};
+    }
+  });
+
+  guidesG.addEventListener('pointermove',evt=>{
+    if(!drag || drag.pointerId!==evt.pointerId) return;
+    const pt=svgPoint(evt);
+
+    if(drag.type==='oneVP'){
+      oneVP.x=clamp(pt.x,40,860);
+      oneVP.y=clamp(pt.y,40,480);
+      currentPoints=onePointGeometry();
+      render();
+    }
+  });
+
+  cubeG.addEventListener('pointermove',evt=>{
+    if(!drag || drag.pointerId!==evt.pointerId) return;
+    const pt=svgPoint(evt);
+
+    if(drag.type==='twoCube'){
+      twoCube.x=clamp(drag.startCubeX + (pt.x-drag.startX), 220, 680);
+      twoCube.y=clamp(drag.startCubeY + (pt.y-drag.startY), 170, 370);
+      currentPoints=twoPointGeometry();
+      render();
+    }
+  });
+
+  function endDrag(evt){
+    if(drag && drag.pointerId===evt.pointerId) drag=null;
+  }
+  handlesG.addEventListener('pointerup',endDrag);
+  handlesG.addEventListener('pointercancel',endDrag);
+  guidesG.addEventListener('pointerup',endDrag);
+  guidesG.addEventListener('pointercancel',endDrag);
+  cubeG.addEventListener('pointerup',endDrag);
+  cubeG.addEventListener('pointercancel',endDrag);
+
+  playBtn.addEventListener('click',async()=>{
+    const token=++playToken;
+    const seq=['oblique','isometric','one','two'];
+    for(const target of seq){
+      if(token!==playToken) return;
+      if((mode==='oblique'||mode==='isometric') && (target==='oblique'||target==='isometric')){
+        await animateAxoTo(target==='oblique'?0:1,700);
+        mode=target; axoT=target==='oblique'?0:1;
+        currentPoints=axoGeometry(axoT);
+        render();
+      }else{
+        const from=currentPoints.map(p=>[...p]);
+        mode=target;
+        if(target==='oblique') axoT=0;
+        if(target==='isometric') axoT=1;
+        const to=geometryFor(target);
+        syncControls();
+        await animatePoints(from,to,760);
+        currentPoints=geometryFor(target);
+        render();
+      }
+      await new Promise(r=>setTimeout(r,350));
+    }
+  });
+
+  currentPoints=axoGeometry(0);
+  render();
+})();
+</script>
+</body>
+</html>
